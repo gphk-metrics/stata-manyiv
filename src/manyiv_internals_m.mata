@@ -142,18 +142,6 @@ void function ManyIVreg_IM::fit(
         epsilon = sf_helper_epsilon(Yp, beta[1::6])
         se[2, 1::6] = sqrt(colsum((epsilon :* hatP):^2)) :/ (T' * hatP)
 
-        // // 5.2 Heteroscedastic
-        // // ols
-        // se[2, 1] = sqrt(sum((sf_helper_epsilon(Yp, beta[1]) :* Yp[.,2]):^2)) / YY[2,2]
-        //
-        // // tsls, liml, mbtsls
-        // hatP = Zp * sf_helper_solve(Zp, Yp[.,2])
-        // se[2, 2::4] = sqrt(colsum((sf_helper_epsilon(Yp, beta[2::4]):*hatP):^2)) / YPY[2, 2]
-        //
-        // // jive
-        // se[2,5] = sqrt(sum((sf_helper_epsilon(Yp, beta[5]):*hatPjive):^2))  / (hatPjive'*T)
-        // se[2,6] = sqrt(sum((sf_helper_epsilon(Yp, beta[6]):*hatPujive):^2)) / (hatPujive'*T)
-
         // -------------------------
         // 5.4 Cluster, if requested
         // -------------------------
