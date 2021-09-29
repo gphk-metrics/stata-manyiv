@@ -1,8 +1,10 @@
 set seed 42
 set linesize 112
-mata mata clear
-qui include ../src/manyiv_internals_m.mata
-qui include ../src/manyiv.ado
+* mata mata clear
+* qui include ../src/manyiv_internals_m.mata
+* qui include ../src/manyiv.ado
+* cap noi net uninstall manyiv
+* net install manyiv, from(`c(pwd)'/../src/)
 
 clear
 set obs 1000

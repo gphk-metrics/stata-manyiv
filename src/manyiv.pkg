@@ -1,0 +1,20 @@
+v 0.1.0
+d
+d 'MANYIV': Many instrumental variables regressions (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
+d
+d KW: iv
+d KW: OLS
+d KW: TSLS
+d KW: LIML
+d KW: MBTSLS
+d KW: JIVE
+d KW: UJIVE
+d KW: RTSLS
+d
+d Requires: Stata version 13.1
+d
+d Distribution-Date: 20210928
+d
+f manyiv.ado
+f manyiv.sthlp
+f manyiv_internals_m.mata

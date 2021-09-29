@@ -1,3 +1,7 @@
+*! version 0.1.1 27Sep2021
+*! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
+*! Adapted for Stata from ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
+
 capture program drop manyiv
 program manyiv, eclass sortpreserve
     syntax anything(equalok) /// dependent_var covariates
@@ -165,8 +169,7 @@ program manyiv, eclass sortpreserve
             mata `ManyIVreg'.print()
         }
 
-        ereturn clear
-        ereturn matrix beta = `beta'
+        ereturn post `beta', esample(`touse')
         if ( `estimatese' ) {
             ereturn matrix se = `se'
         }
@@ -227,3 +230,6 @@ program helper_strip_omitted, rclass
     return local varlist:  copy local varlist
     return matrix omit =  `omit'
 end
+
+qui findfile manyiv_internals_m.mata
+qui do `"`r(fn)'"'

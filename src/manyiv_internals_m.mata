@@ -263,7 +263,7 @@ void function ManyIVreg_IM::print()
     printf("\n%g observations, ", n)
     printf("%g instrument%s, ", K, (K > 1)? "s": "")
     printf("%g covariate%s, ", L, (L > 1)? "s": "")
-    printf("first-stage F=%5.1fc\n", F)
+    printf("first-stage F = %5.1fc\n", F)
 }
 
 real matrix function sf_helper_epsilon(real matrix Yp, real rowvector beta)
