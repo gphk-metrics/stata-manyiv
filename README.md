@@ -31,6 +31,7 @@ net install manyiv, from(`github'/mcaceresb/stata-manyiv/master/src/)
 
 ```
 manyiv depvar (endogenous = instrument) [exogenous], options
+help manyiv
 ```
 
 ### Examples
