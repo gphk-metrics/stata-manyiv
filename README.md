@@ -10,7 +10,7 @@ Various instrumental variables regressions (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE
 From the command line
 
 ```
-git clone https://github.com/mcaceresb/stata-manyiv
+git clone git@github.com:mcaceresb/stata-manyiv
 ```
 
 From Stata
