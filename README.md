@@ -7,15 +7,16 @@ Various instrumental variables regressions (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE
 
 ### Installation
 
-From the command line
+From the command line:
 
 ```
 git clone git@github.com:mcaceresb/stata-manyiv
 ```
 
-From Stata
+(or download the code manually and unzip). From Stata:
 
 ```
+cap noi net uninstall manyiv
 net install manyiv, from(`c(pwd)'/stata-manyiv/src)
 ```
 
