@@ -1,12 +1,16 @@
-*! version 0.1.1 27Sep2021
+*! version 0.2.0 30Sep2021
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Adapted for Stata from ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 
+* TODO: Number of controls L = cols(W) does not account for collinear groups
+* TODO: Absorb with constant is incorrect
 capture program drop manyiv
 program manyiv, eclass sortpreserve
     syntax anything(equalok) /// dependent_var covariates
            [if] [in] ,       /// subset
     [                        ///
+        absorb(str)          ///
+                             ///
         internals(str)       ///
         SAVEresults(str)     /// name of mata object to store results
                              ///
@@ -45,11 +49,17 @@ program manyiv, eclass sortpreserve
     *                           Parse varlists                            *
     ***********************************************************************
 
+    * TODO: xx what is diag(D (D' D)^-1 D) when D has multiple FE vars?
+    if ( `:list sizeof absorb' > 1 ) {
+        disp as err "I haven't yet figured out the JIVE/UJIVE algebra with multiple absorb variables"
+        exit 198
+    }
+
     * TODO: xx double-check constant parsing
     local varlist `ivdepvar' `ivendog' `ivinst' `ivexog'
     marksample touse
 
-    tempname Y X Z W C
+    tempname Y X Z W C A
     fvexpand `ivexog'
     local ivexog `r(varlist)'
 
@@ -72,7 +82,7 @@ program manyiv, eclass sortpreserve
         mata `W' = J(rows(`Y'), 0, 0)
     }
 
-    if ( "`constant'" != "noconstant" ) {
+    if ( ("`constant'" != "noconstant") & ("`absorb'" == "") ) {
         mata `W' = `W', J(rows(`Y'), 1, 1)
     }
 
@@ -151,6 +161,8 @@ program manyiv, eclass sortpreserve
     if "`ManyIVreg'"  == "" tempname ManyIVreg
 
     {
+        mata `A' = New_ManyIVreg_Absorb(tokens(st_local("absorb")), "`touse'")
+
         if ("`cluster'" != "") {
             tempvar clusterid
             sort `cluster' `touse'
@@ -162,7 +174,7 @@ program manyiv, eclass sortpreserve
         else mata `C' = .
 
         mata `ManyIVreg' = ManyIVreg_IM()
-        mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `C')
+        mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `C', `A')
         mata `ManyIVreg'.results("`beta'", "`se'")
 
         if ( "`printtable'" != "noprinttable" ) {
@@ -231,5 +243,8 @@ program helper_strip_omitted, rclass
     return matrix omit =  `omit'
 end
 
-qui findfile manyiv_internals_m.mata
-qui do `"`r(fn)'"'
+// cap findfile manyiv_absorb.mata
+// cap do `"`r(fn)'"'
+// 
+// cap findfile manyiv_internals_m.mata
+// cap do `"`r(fn)'"'

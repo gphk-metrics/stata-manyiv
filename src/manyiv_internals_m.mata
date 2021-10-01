@@ -35,22 +35,37 @@ class ManyIVreg_IM
     string colvector seLabels
 }
 
+// y              = `Y'
+// T              = `X'
+// Z              = `Z'
+// W              = `W'
+// _estimatese    = `estimatese'
+// _estimatestats = `estimatestats'
+// cluster        = `C'
+// Absorb         = New_ManyIVreg_Absorb(tokens(st_local("absorb")), "`touse'")
+
 void function ManyIVreg_IM::fit(
     real colvector y,
     real colvector T,
     real matrix Z,
     real matrix W,
-    real scalar estimatese,
-    real scalar estimatestats, |real colvector cluster)
+    real scalar _estimatese,
+    real scalar _estimatestats,
+    real colvector cluster,
+    class ManyIVreg_Absorb scalar Absorb)
 {
     real scalar i, j
+    real matrix Xi, Wraw, Zraw
     real vector overid, pvalue
-    real matrix Xi
+    real colvector Traw, D
 
-    real matrix Yp, Zp, RFS, YY, YPY, YMY, ZW, Cinfo
+    real matrix Yp, Zp, RFS, YY, YPY, YMY, ZW, Cinfo, yTWZ
     real matrix epsilon, epsilon_i, hatP, hatP_i
     real vector k, ei, sec, DZW, DW, iIDZW, iIDW
     real vector hatTjive, hatTujive, hatPjive, hatPujive
+
+    estimatese = _estimatese
+    estimatestats = _estimatestats
 
     n = rows(Z)
     K = cols(Z)
@@ -63,12 +78,27 @@ void function ManyIVreg_IM::fit(
     // of interest and the instrument onto W's null space then use
     // univariate formulas.
 
-    Yp  = sf_helper_annihilator(W, (y, T))   // [y_⊥ T_⊥] = M_W [y T]
-    Zp  = sf_helper_annihilator(W, Z)        // Z_⊥       = M_W Z
-    YY  = (Yp' * Yp)                         // [y_⊥ T_⊥]' [y_⊥ T_⊥] = [y T]' M_W [y T]
-    RFS = sf_helper_solve(Zp, Yp)            // [solve(Z_⊥, y_⊥) solve(Z_⊥, T_⊥)] = Reduced form and First stage
-    YPY = (Yp' * Zp) * RFS                   // [y_⊥ T_⊥]' H_{Z_⊥} [y_⊥ T_⊥]
-    YMY = YY - YPY                           // [y_⊥ T_⊥]' M_{Z_⊥} [y_⊥ T_⊥]
+    // NOTE: You can same memory here using pointers; copy for now
+    // Traw = T
+    // Wraw = W
+    // Zraw = Z
+    Tp = T
+    Yp = (y, T)
+    if ( Absorb.nabsorb ) {
+        L    = L + Absorb.total_nlevels - Absorb.nabsorb + 1
+        yTZW = Absorb.hdfe((Yp, Z, W))
+        Yp   = yTZW[., 1::2]
+        Tp   = Yp[., 2]
+        Z    = yTZW[., 3::(3 + K - 1)]
+        W    = yTZW[., (3 + K)::cols(yTZW)]
+    }
+
+    Yp  = sf_helper_annihilator(W, Yp) // [y_⊥ T_⊥] = M_W [y T]
+    Zp  = sf_helper_annihilator(W, Z)  // Z_⊥       = M_W Z
+    YY  = (Yp' * Yp)                   // [y_⊥ T_⊥]' [y_⊥ T_⊥] = [y T]' M_W [y T]
+    RFS = sf_helper_solve(Zp, Yp)      // [solve(Z_⊥, y_⊥) solve(Z_⊥, T_⊥)] = Reduced form and First stage
+    YPY = (Yp' * Zp) * RFS             // [y_⊥ T_⊥]' H_{Z_⊥} [y_⊥ T_⊥]
+    YMY = YY - YPY                     // [y_⊥ T_⊥]' M_{Z_⊥} [y_⊥ T_⊥]
 
     // 2.1 k-class: OLS, TSLS, LIML, MBTLS
     // Note: These are all coded as
@@ -86,23 +116,36 @@ void function ManyIVreg_IM::fit(
     beta = (YY[1, 2] :- k :* YMY[1, 2]) :/ (YY[2, 2] :- k :* YMY[2, 2])
 
     // 2.2 JIVE, UJIVE
-    ZW     = (W, Z)
-    DZW    = rowsum((ZW * invsym(ZW' * ZW)) :* ZW) // D_{Z W} = diag(H_{Z W}) as a vector
-    iIDZW  = 1 :/ (1 :- DZW)                       // (I - D_{Z W})^{-1} as a vector
-    DW     = rowsum((W * invsym(W'*W)) :* W)       // D_W = diag(H_W) as a vector
-    iIDW   = 1 :/ (1 :- DW)                        // (I - D_W)^{-1} as a vector
+    ZW  = (W, Z)
+    DZW = rowsum((ZW * invsym(ZW' * ZW)) :* ZW) // D_{Z W} = diag(H_{Z W}) as a vector
+    DW  = rowsum((W * invsym(W'*W)) :* W)       // D_W     = diag(H_W) as a vector
+    if ( Absorb.nabsorb ) {
+        Absorb.encode()
 
-    hatTujive = T :- iIDZW :* sf_helper_annihilator(ZW, T) //     (I - (I - D_{Z W})^{-1} M_{Z W}) T
-    hatPjive  = sf_helper_annihilator(W, hatTujive)        // M_W (I - (I - D_{Z W})^{-1} M_{Z W}) T
-    hatTjive  = T :- iIDW :* sf_helper_annihilator(W, T)   // (I - (I - D_W)^{-1} M_W) T
-    hatPujive = hatTujive - hatTjive                       // (I - D_W)^{-1} M_W T - (I - D_{Z W})^{-1} M_{Z W} T
-                                                           // = (I - D_W)^{-1} (I - H_W) T - (I - D_{Z W})^{-1} (I - H_{Z W}) T
-                                                           // = ((I - D_{Z W})^{-1} (H_{Z W} - I) - (I - D_W)^{-1} (H_W - I) T) T
-                                                           // = (
-                                                           //     (I - D_{Z W})^{-1} (H_{Z W} - D_{Z W} - (I - D_{Z W})) -
-                                                           //     (I - D_W)^{-1} (H_W - D_W - (I - D_W))
-                                                           // ) T
-                                                           // = ((I - D_{Z W})^{-1} (H_{Z W} - D_{Z W}) - (I - D_W)^{-1} (H_W - D_W)) T
+        // TODO: xx In general this is the diagonal of the HDE
+        // projection matrix; I don't know atm how to get it if there is
+        // more than one grouping variabe.
+
+        D   = 1 :/ Absorb.nj(1)[Absorb.groupid(1)]
+        DZW = DZW + D
+        DW  = DW  + D
+    }
+    iIDZW  = 1 :/ (1 :- DZW) // (I - D_{Z W})^{-1} as a vector
+    iIDW   = 1 :/ (1 :- DW)  // (I - D_W)^{-1} as a vector
+
+    hatTujive = T :- iIDZW :* sf_helper_annihilator(ZW, Tp) //     (I - (I - D_{Z W})^{-1} M_{Z W}) T
+    hatPjive  = sf_helper_annihilator(W, hatTujive)         // M_W (I - (I - D_{Z W})^{-1} M_{Z W}) T
+    Absorb._hdfe(hatPjive)
+
+    hatTjive  = T :- iIDW :* sf_helper_annihilator(W, Tp)   // (I - (I - D_W)^{-1} M_W) T
+    hatPujive = hatTujive - hatTjive // (I - D_W)^{-1} M_W T - (I - D_{Z W})^{-1} M_{Z W} T
+                                     // = (I - D_W)^{-1} (I - H_W) T - (I - D_{Z W})^{-1} (I - H_{Z W}) T
+                                     // = ((I - D_{Z W})^{-1} (H_{Z W} - I) - (I - D_W)^{-1} (H_W - I) T) T
+                                     // = (
+                                     //     (I - D_{Z W})^{-1} (H_{Z W} - D_{Z W} - (I - D_{Z W})) -
+                                     //     (I - D_W)^{-1} (H_W - D_W - (I - D_W))
+                                     // ) T
+                                     // = ((I - D_{Z W})^{-1} (H_{Z W} - D_{Z W}) - (I - D_W)^{-1} (H_W - D_W)) T
 
     beta =  (
         beta,
@@ -146,7 +189,7 @@ void function ManyIVreg_IM::fit(
         // 5.4 Cluster, if requested
         // -------------------------
 
-        clustered = missing(cluster) == 0
+        clustered = (missing(cluster) == 0)
         if ( clustered ) {
             sec   = J(1, 6, 0)
             Cinfo = panelsetup(cluster, 1)

@@ -1,4 +1,4 @@
-v 0.1.0
+v 0.2.0
 d
 d 'MANYIV': Many instrumental variables regressions (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 d
@@ -13,8 +13,9 @@ d KW: RTSLS
 d
 d Requires: Stata version 13.1
 d
-d Distribution-Date: 20210928
+d Distribution-Date: 20210930
 d
 f manyiv.ado
 f manyiv.sthlp
 f manyiv_internals_m.mata
+f manyiv_absorb.mata

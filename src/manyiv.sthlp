@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.1.0 28Sep2021}{...}
+{* *! version 0.2.0 30Sep2021}{...}
 {viewerdialog manyiv "dialog manyiv"}{...}
 {vieweralsosee "[R] manyiv" "mansection R manyiv"}{...}
 {viewerjumpto "Syntax" "manyiv##syntax"}{...}
@@ -30,6 +30,8 @@ Run multiple IV regressions:
 {marker table_options}{...}
 {synopthdr}
 {synoptline}
+{synopt :{opth absorb(varname)}} Control to absorb as fixed effects (single variable at the moment).
+{p_end}
 {synopt :{opth save:results(str)}} Save results into mata object.
 {p_end}
 {synopt :{opth cluster(varname)}} ClusterSEs by variable.
