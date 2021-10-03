@@ -4,12 +4,17 @@
 
 * TODO: Number of controls L = cols(W) does not account for collinear groups
 * TODO: Absorb with constant is incorrect
+* TODO: Allow absorb with no controls
+* TODO: Allow absorbiv with no instruments
+* TODO: absorbiv doesn't account for the constant correctly
+* TODO: absorb and absorbiv have a base group atm; maybe just don't allow a noc opion and that does solve all your issues?
 capture program drop manyiv
 program manyiv, eclass sortpreserve
     syntax anything(equalok) /// dependent_var covariates
            [if] [in] ,       /// subset
     [                        ///
-        absorb(str)          ///
+        absorb(str)          /// Absorb controls
+        absorbiv(str)        /// Absorb instruments
                              ///
         internals(str)       ///
         SAVEresults(str)     /// name of mata object to store results
@@ -55,11 +60,16 @@ program manyiv, eclass sortpreserve
         exit 198
     }
 
+    if ( (`:list sizeof absorb') & (`:list sizeof absorbiv') ) {
+        disp as err "I haven't yet figured out the algebra absorb() _and_ absorbiv()"
+        exit 198
+    }
+
     * TODO: xx double-check constant parsing
     local varlist `ivdepvar' `ivendog' `ivinst' `ivexog'
     marksample touse
 
-    tempname Y X Z W C A
+    tempname Y X Z W C A IV
     fvexpand `ivexog'
     local ivexog `r(varlist)'
 
@@ -82,7 +92,7 @@ program manyiv, eclass sortpreserve
         mata `W' = J(rows(`Y'), 0, 0)
     }
 
-    if ( ("`constant'" != "noconstant") & ("`absorb'" == "") ) {
+    if ( "`constant'" != "noconstant" ) {
         mata `W' = `W', J(rows(`Y'), 1, 1)
     }
 
@@ -161,7 +171,8 @@ program manyiv, eclass sortpreserve
     if "`ManyIVreg'"  == "" tempname ManyIVreg
 
     {
-        mata `A' = New_ManyIVreg_Absorb(tokens(st_local("absorb")), "`touse'")
+        mata `A'  = New_ManyIVreg_Absorb(tokens(st_local("absorb")),   "`touse'")
+        mata `IV' = New_ManyIVreg_Absorb(tokens(st_local("absorbiv")), "`touse'")
 
         if ("`cluster'" != "") {
             tempvar clusterid
@@ -174,7 +185,7 @@ program manyiv, eclass sortpreserve
         else mata `C' = .
 
         mata `ManyIVreg' = ManyIVreg_IM()
-        mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `C', `A')
+        mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `C', `A', `IV')
         mata `ManyIVreg'.results("`beta'", "`se'")
 
         if ( "`printtable'" != "noprinttable" ) {

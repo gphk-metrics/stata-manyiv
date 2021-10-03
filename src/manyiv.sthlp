@@ -32,6 +32,8 @@ Run multiple IV regressions:
 {synoptline}
 {synopt :{opth absorb(varname)}} Control to absorb as fixed effects (single variable at the moment).
 {p_end}
+{synopt :{opth absorbiv(varname)}} Instrument to absorb as fixed effects (single variable at the moment).
+{p_end}
 {synopt :{opth save:results(str)}} Save results into mata object.
 {p_end}
 {synopt :{opth cluster(varname)}} ClusterSEs by variable.

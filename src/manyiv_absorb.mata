@@ -10,6 +10,7 @@ class ManyIVreg_Absorb
     real scalar nabsorb
     real scalar hdfetol
     real scalar maxiter
+    real scalar encoded
     real vector nlevels
     real vector total_nlevels
 
@@ -17,6 +18,7 @@ class ManyIVreg_Absorb
     void init()
     real scalar makepanel()
     real colvector index()
+    real colvector select()
     real matrix info()
     real colvector nj()
     real colvector groupid()
@@ -38,6 +40,7 @@ void function ManyIVreg_Absorb::new()
 {
     this.hdfetol = 1e-8
     this.maxiter = 1000
+    this.encoded = 0
 }
 
 void function ManyIVreg_Absorb::init(string vector _absorbvars, string scalar _touse)
@@ -99,24 +102,29 @@ real colvector function ManyIVreg_Absorb::groupid(real scalar j)
     return(asarray(absorbinfo, absorbvars[j] + ".groupid"))
 }
 
-real matrix function ManyIVreg_Absorb::hdfe(real matrix X)
+real colvector function ManyIVreg_Absorb::select(real scalar j, real scalar i)
 {
-    _hdfe(X)
+    return(panelsubmatrix(index(j), i, info(j)))
+}
+
+real matrix function ManyIVreg_Absorb::hdfe(real matrix X, | real scalar base)
+{
+    _hdfe(X, base)
     return(X)
 }
 
-void function ManyIVreg_Absorb::_hdfe(real matrix X)
+void function ManyIVreg_Absorb::_hdfe(real matrix X, | real scalar base)
 {
     real scalar i, dev
     if ( nabsorb == 1 ) {
-        (void) _demean(X, 1)
+        (void) _demean(X, 1, base)
     }
     else if ( nabsorb > 1 ) {
         i       = 0
         dev     = 1
         while ( i++ < maxiter ) {
             for (j = 1; j <= nabsorb; j++) {
-                dev = _demean(X, j)
+                dev = _demean(X, j, base)
                 if ( dev < hdfetol ) break
             }
             if ( dev < hdfetol ) break
@@ -131,7 +139,7 @@ void function ManyIVreg_Absorb::_hdfe(real matrix X)
     }
 }
 
-real scalar function ManyIVreg_Absorb::_demean(real matrix X, real scalar j)
+real scalar function ManyIVreg_Absorb::_demean(real matrix X, real scalar j, | real scalar base)
 {
     real colvector avg
     real colvector sel
@@ -139,7 +147,9 @@ real scalar function ManyIVreg_Absorb::_demean(real matrix X, real scalar j)
     real scalar i, dev
 
     dev = 0
+    if ( args() < 3 ) base = 0
     for(i = 1; i <= nlevels[j]; i++) {
+        if ( i == base ) continue
         sel = panelsubmatrix(index(j), i, info(j))
         X_i = X[sel, .]
         avg = (colsum(X_i) :/ length(sel))
@@ -155,13 +165,16 @@ void function ManyIVreg_Absorb::encode()
     real colvector sel, groupid
     real scalar i, j
 
-    for(j = 1; j <= nabsorb; j++) {
-        groupid = J(nobs, 1, .)
-        for(i = 1; i <= nlevels[j]; i++) {
-            sel = panelsubmatrix(index(j), i, info(j))
-            groupid[sel] = J(length(sel), 1, i)
+    if ( encoded == 0 ) {
+        for(j = 1; j <= nabsorb; j++) {
+            groupid = J(nobs, 1, .)
+            for(i = 1; i <= nlevels[j]; i++) {
+                sel = panelsubmatrix(index(j), i, info(j))
+                groupid[sel] = J(length(sel), 1, i)
+            }
+            asarray(absorbinfo, absorbvars[j] + ".groupid", groupid)
         }
-        asarray(absorbinfo, absorbvars[j] + ".groupid", groupid)
     }
+    encoded = 1
 }
 end

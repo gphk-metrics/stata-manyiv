@@ -15,9 +15,17 @@ gen z2 = rnormal()
 gen e  = rnormal() + u
 gen c  = int(runiform() * 10)
 gen fe = int(runiform() * 15)
+gen iv = int(runiform() * 8)
 gen w  = rnormal()
-gen x  = 1 + 0.1 * z1 - 0.2 * z2 + u
+gen x  = 1 + 0.1 * z1 - 0.2 * z2 - 1/(1 + iv) + u
 gen y  = 1 + x + w + 1/(1 + fe) + e
+
+manyiv y (x = z1 z2 i.iv) w
+matrix list e(b)
+matrix list e(se)
+manyiv y (x = z1 z2) w, absorbiv(iv)
+matrix list e(b)
+matrix list e(se)
 
 manyiv y (x = z1 z2) w
 manyiv y (x = z1 z2) w i.fe
