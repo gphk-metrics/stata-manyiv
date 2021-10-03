@@ -10,9 +10,9 @@ class ManyIVreg_Absorb
     real scalar nabsorb
     real scalar hdfetol
     real scalar maxiter
-    real scalar encoded
     real vector nlevels
     real vector total_nlevels
+    real vector encoded
 
     void new()
     void init()
@@ -22,10 +22,12 @@ class ManyIVreg_Absorb
     real matrix info()
     real colvector nj()
     real colvector groupid()
+    real colvector d_projection()
     void encode()
     real scalar _demean()
     real matrix hdfe()
     void _hdfe()
+    void append()
 }
 
 class ManyIVreg_Absorb scalar function New_ManyIVreg_Absorb(string vector _absorbvars, string scalar _touse)
@@ -45,12 +47,13 @@ void function ManyIVreg_Absorb::new()
 
 void function ManyIVreg_Absorb::init(string vector _absorbvars, string scalar _touse)
 {
-    absorbvars = _absorbvars
-    touse = _touse
-    nabsorb = length(absorbvars)
-    absorbinfo = asarray_create()
+    absorbvars    = _absorbvars
+    touse         = _touse
+    nabsorb       = length(absorbvars)
+    absorbinfo    = asarray_create()
     total_nlevels = 0
-    nlevels = J(1, nabsorb, .)
+    nlevels       = J(1, nabsorb, .)
+    encoded       = J(1, nabsorb, 0)
     for(j = 1; j <= nabsorb; j++) {
         nlevels[j] = makepanel(absorbvars[j])
         total_nlevels = total_nlevels + nlevels[j]
@@ -134,7 +137,7 @@ void function ManyIVreg_Absorb::_hdfe(real matrix X, | real scalar base)
             error(1234)
         }
         else {
-            printf("hdfe convergence after %g projections (error = %5.3g)", i * nabsorb + j, dev)
+            printf("hdfe convergence after %g projections (error = %5.3g)\n", i * nabsorb + j, dev)
         }
     }
 }
@@ -165,16 +168,88 @@ void function ManyIVreg_Absorb::encode()
     real colvector sel, groupid
     real scalar i, j
 
-    if ( encoded == 0 ) {
+    for(j = 1; j <= nabsorb; j++) {
+        if ( encoded[j] ) continue
+        groupid = J(nobs, 1, .)
+        for(i = 1; i <= nlevels[j]; i++) {
+            sel = panelsubmatrix(index(j), i, info(j))
+            groupid[sel] = J(length(sel), 1, i)
+        }
+        asarray(absorbinfo, absorbvars[j] + ".groupid", groupid)
+        encoded[j] = 1
+    }
+}
+
+real colvector function ManyIVreg_Absorb::d_projection(| real scalar base)
+{
+    real scalar j
+    real matrix DD
+    real colvector D, ix
+    if ( args() < 1 ) base = 0
+
+    encode()
+    if ( nabsorb == 0 ) {
+        return(0)
+    }
+    else if ( nabsorb == 1 ) {
+        D = 1 :/ nj(1)[groupid(1)]
+        if ( base ) {
+            D[select(1, base)] = J(nj(1)[base], 1, 0)
+        }
+        return(D)
+    }
+    else {
+        printf("resource warning: creating the full set of FE as temporary variables\n")
+        DD = J(nobs, 0, .)
         for(j = 1; j <= nabsorb; j++) {
-            groupid = J(nobs, 1, .)
-            for(i = 1; i <= nlevels[j]; i++) {
-                sel = panelsubmatrix(index(j), i, info(j))
-                groupid[sel] = J(length(sel), 1, i)
-            }
-            asarray(absorbinfo, absorbvars[j] + ".groupid", groupid)
+            ix = selectindex((1::nlevels[j]) :!= base)
+            DD = DD, designmatrix(groupid(j))[., ix]
+        }
+        D = rowsum((DD * invsym(DD' * DD)) :* DD)
+        return(D)
+    }
+}
+
+void function ManyIVreg_Absorb::append(class ManyIVreg_Absorb scalar Absorb)
+{
+    real vector exists, append_index
+    real scalar j
+
+    if ( Absorb.nabsorb == 0 ) {
+        return
+    }
+
+    if ( nobs != Absorb.nobs ) {
+        errprintf("cannot append different number of observations (%g vs %g)\n", nobs, Absorb.nobs)
+        error(1234)
+    }
+
+    exists = J(Absorb.nabsorb, 1, 0)
+    for (j = 1; j <= Absorb.nabsorb; j++) {
+        if ( any(Absorb.absorbvars[j] :== absorbvars) ) {
+            exists[j] = 1
         }
     }
-    encoded = 1
+
+    if ( all(exists) ) {
+        printf("all absorb variables already exist; no append\n")
+        return
+    }
+    append_index = selectindex(!exists)
+
+    absorbvars = absorbvars, Absorb.absorbvars[append_index]
+    nabsorb = nabsorb + Absorb.nabsorb
+    hdfetol = min((hdfetol, Absorb.hdfetol))
+    maxiter = max((maxiter, Absorb.maxiter))
+    nlevels = nlevels, Absorb.nlevels[append_index]
+    total_nlevels = total_nlevels + Absorb.total_nlevels
+    encoded = encoded, Absorb.encoded[append_index]
+
+    for (j = 1; j <= Absorb.nabsorb; j++) {
+        if ( exists[j] ) continue
+        asarray(absorbinfo, Absorb.absorbvars[j] + ".index", Absorb.index(j))
+        asarray(absorbinfo, Absorb.absorbvars[j] + ".info",  Absorb.info(j))
+        asarray(absorbinfo, Absorb.absorbvars[j] + ".nj",    Absorb.nj(j))
+    }
 }
 end

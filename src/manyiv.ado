@@ -2,12 +2,10 @@
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Adapted for Stata from ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 
-* TODO: Number of controls L = cols(W) does not account for collinear groups
-* TODO: Absorb with constant is incorrect
-* TODO: Allow absorb with no controls
-* TODO: Allow absorbiv with no instruments
-* TODO: absorbiv doesn't account for the constant correctly
-* TODO: absorb and absorbiv have a base group atm; maybe just don't allow a noc opion and that does solve all your issues?
+* TODO: allow absorbiv with no instruments
+* TODO: absorb and absorbiv don't account for collinearity atm
+* TODO: number of instruments check does not account for absorbed instruments
+* TODO: detect repeated variables between absorb and varist (z or w varlist)
 capture program drop manyiv
 program manyiv, eclass sortpreserve
     syntax anything(equalok) /// dependent_var covariates
@@ -19,7 +17,7 @@ program manyiv, eclass sortpreserve
         internals(str)       ///
         SAVEresults(str)     /// name of mata object to store results
                              ///
-        noCONStant           /// omit constant
+        /// noCONStant       /// omit constant; a bit of a pain to account for
         noPRINTtable         /// do not print table
         nose                 /// omit standard errors
         nostats              /// omit additional statistics
@@ -54,18 +52,6 @@ program manyiv, eclass sortpreserve
     *                           Parse varlists                            *
     ***********************************************************************
 
-    * TODO: xx what is diag(D (D' D)^-1 D) when D has multiple FE vars?
-    if ( `:list sizeof absorb' > 1 ) {
-        disp as err "I haven't yet figured out the JIVE/UJIVE algebra with multiple absorb variables"
-        exit 198
-    }
-
-    if ( (`:list sizeof absorb') & (`:list sizeof absorbiv') ) {
-        disp as err "I haven't yet figured out the algebra absorb() _and_ absorbiv()"
-        exit 198
-    }
-
-    * TODO: xx double-check constant parsing
     local varlist `ivdepvar' `ivendog' `ivinst' `ivexog'
     marksample touse
 
@@ -80,29 +66,18 @@ program manyiv, eclass sortpreserve
     mata `Y' = st_data(., "`ivdepvar'", "`touse'")
     mata `X' = st_data(., "`ivendog'",  "`touse'")
 
-    helper_strip_omitted `ivinst' if `touse', `constant'
+    helper_strip_omitted `ivinst' if `touse',
     mata `Z' = select(st_data(., "`ivinst'", "`touse'"), !st_matrix("r(omit)"))
     local ivinst `r(varlist)'
 
     if ( `:list sizeof ivexog' ) {
         helper_strip_omitted `ivexog' if `touse', `constant'
-        mata `W' = select(st_data(., "`ivexog'", "`touse'"), !st_matrix("r(omit)"))
+        mata `W' = select(st_data(., "`ivexog'", "`touse'"), !st_matrix("r(omit)")), J(rows(`Y'), 1, 1)
+        local ivexog `r(varlist)'
     }
     else {
-        mata `W' = J(rows(`Y'), 0, 0)
+        mata `W' = J(rows(`Y'), 1, 1)
     }
-
-    if ( "`constant'" != "noconstant" ) {
-        mata `W' = `W', J(rows(`Y'), 1, 1)
-    }
-
-    * TODO: Fix this
-    if ( ("`ivexog'" == "") & ("`constant'" == "noconstant") ) {
-        disp as err "empty list of exogenous covariates not yet implemented"
-        exit 198
-    }
-
-    local ivexog `r(varlist)'
 
     tempname kendog kinst
     mata: st_numscalar("`kendog'", cols(st_data(1, "`ivendog'")))
@@ -170,47 +145,45 @@ program manyiv, eclass sortpreserve
     if "`ManyIVData'" == "" tempname ManyIVData
     if "`ManyIVreg'"  == "" tempname ManyIVreg
 
-    {
-        mata `A'  = New_ManyIVreg_Absorb(tokens(st_local("absorb")),   "`touse'")
-        mata `IV' = New_ManyIVreg_Absorb(tokens(st_local("absorbiv")), "`touse'")
+    mata `A'  = New_ManyIVreg_Absorb(tokens(st_local("absorb")),   "`touse'")
+    mata `IV' = New_ManyIVreg_Absorb(tokens(st_local("absorbiv")), "`touse'")
 
-        if ("`cluster'" != "") {
-            tempvar clusterid
-            sort `cluster' `touse'
-            by `cluster' `touse': gen long `clusterid' = (_n == 1) & `touse'
-            replace `clusterid' = sum(`clusterid')
-            replace `clusterid' = . if !`touse'
-            mata `C' = st_data(., "`clusterid'",  "`touse'")
-        }
-        else mata `C' = .
+    if ("`cluster'" != "") {
+        tempvar clusterid
+        sort `cluster' `touse'
+        by `cluster' `touse': gen long `clusterid' = (_n == 1) & `touse'
+        replace `clusterid' = sum(`clusterid')
+        replace `clusterid' = . if !`touse'
+        mata `C' = st_data(., "`clusterid'",  "`touse'")
+    }
+    else mata `C' = .
 
-        mata `ManyIVreg' = ManyIVreg_IM()
-        mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `C', `A', `IV')
-        mata `ManyIVreg'.results("`beta'", "`se'")
+    mata `ManyIVreg' = ManyIVreg_IM()
+    mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `C', `A', `IV')
+    mata `ManyIVreg'.results("`beta'", "`se'")
 
-        if ( "`printtable'" != "noprinttable" ) {
-            mata `ManyIVreg'.print()
-        }
+    if ( "`printtable'" != "noprinttable" ) {
+        mata `ManyIVreg'.print()
+    }
 
-        ereturn post `beta', esample(`touse')
-        if ( `estimatese' ) {
-            ereturn matrix se = `se'
-        }
+    ereturn post `beta', esample(`touse')
+    if ( `estimatese' ) {
+        ereturn matrix se = `se'
+    }
 
-        tempname F Omega Xi Sargan CD
-        mata st_numscalar("`F'", `ManyIVreg'.stats.F)
-        ereturn scalar F = `F'
-        if ( `estimatestats' ) {
-            mata st_matrix("`Omega'",  `ManyIVreg'.stats.Omega)
-            mata st_matrix("`Xi'",     `ManyIVreg'.stats.Xi)
-            mata st_matrix("`Sargan'", `ManyIVreg'.stats.Sargan)
-            mata st_matrix("`CD'",     `ManyIVreg'.stats.CD)
+    tempname F Omega Xi Sargan CD
+    mata st_numscalar("`F'", `ManyIVreg'.stats.F)
+    ereturn scalar F = `F'
+    if ( `estimatestats' ) {
+        mata st_matrix("`Omega'",  `ManyIVreg'.stats.Omega)
+        mata st_matrix("`Xi'",     `ManyIVreg'.stats.Xi)
+        mata st_matrix("`Sargan'", `ManyIVreg'.stats.Sargan)
+        mata st_matrix("`CD'",     `ManyIVreg'.stats.CD)
 
-            ereturn matrix Omega  = `Omega'
-            ereturn matrix Xi     = `Xi'
-            ereturn matrix Sargan = `Sargan'
-            ereturn matrix CD     = `CD'
-        }
+        ereturn matrix Omega  = `Omega'
+        ereturn matrix Xi     = `Xi'
+        ereturn matrix Sargan = `Sargan'
+        ereturn matrix CD     = `CD'
     }
 end
 

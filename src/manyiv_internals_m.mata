@@ -38,7 +38,8 @@ class ManyIVreg_IM
 // y              = `Y'
 // T              = `X'
 // Z              = `Z'[., 1::2]
-// W              = `W'
+// W              = `W'[., (1 \ cols(`W'))]
+// DD             = `Z'[., 3::cols(`Z')], `W'[., (2::(cols(`W')-1))]
 // _estimatese    = `estimatese'
 // _estimatestats = `estimatestats'
 // cluster        = `C'
@@ -59,7 +60,6 @@ void function ManyIVreg_IM::fit(
     real scalar i, j
     real matrix Xi
     real vector overid, pvalue
-    real colvector D
 
     real matrix Zp, RFS, YY, YPY, YMY, ZW, Cinfo
     real matrix epsilon, epsilon_i, hatP, hatP_i
@@ -86,8 +86,8 @@ void function ManyIVreg_IM::fit(
         yTZW = Absorb.hdfe((y, T, Z, W), 1)
         yp   = yTZW[., 1]
         Tp   = yTZW[., 2]
-        Zp   = yTZW[., 3::(3 + K - 1)]
-        Wp   = yTZW[., (3 + K)::cols(yTZW)]
+        Zp   = yTZW[., 3::(3 + cols(Z) - 1)]
+        Wp   = yTZW[., (3 + cols(Z))::cols(yTZW)]
     }
     else {
         yp   = y
@@ -96,16 +96,14 @@ void function ManyIVreg_IM::fit(
         Wp   = W
     }
 
-// TODO: xx write AbsorbIV.append(Absorb) method so this hdfe takes W's FE into account
-// TODO: xx `:list sizeof absorb' + `:list sizeof absorb' > 1 means jive/ujive cannot be computed
-
     if ( AbsorbIV.nabsorb ) {
+        K    = K + AbsorbIV.total_nlevels - AbsorbIV.nabsorb
+        AbsorbIV.append(Absorb)
         yTZW = AbsorbIV.hdfe((y, T, Z, W), 1)
         yq   = yTZW[., 1]
         Tq   = yTZW[., 2]
-        Zq   = yTZW[., 3::(3 + K - 1)]
-        Wq   = yTZW[., (3 + K)::cols(yTZW)]
-        K    = K + AbsorbIV.total_nlevels - AbsorbIV.nabsorb
+        Zq   = yTZW[., 3::(3 + cols(Z) - 1)]
+        Wq   = yTZW[., (3 + cols(Z))::cols(yTZW)]
     }
     else {
         yq   = yp
@@ -113,6 +111,19 @@ void function ManyIVreg_IM::fit(
         Zq   = Zp
         Wq   = Wp
     }
+
+    // AbsorbTest = New_ManyIVreg_Absorb(tokens("iv fe"), "`touse'")
+    // max(abs(MWD_yT_bak    :- MWD_yT))
+    // max(abs(MWD_yT_bak    :- AbsorbTest.hdfe(MWD_yT)))
+    // max(abs(MWD_yT_bak    :- MWD_yT))
+    // max(abs(MWD_yT_bak    :- sf_helper_annihilator(AbsorbTest.hdfe(W, 1), AbsorbTest.hdfe((y, T), 1))))
+    // max(abs(MWD_Z_bak[., 1::2]     :- sf_helper_annihilator(AbsorbTest.hdfe(W, 1), AbsorbTest.hdfe(Z, 1))))
+
+    // yTZW = AbsorbTest.hdfe((y, T, Z, W), 1)
+    // yq   = yTZW[., 1]
+    // Tq   = yTZW[., 2]
+    // Zq   = yTZW[., 3::(3 + cols(Z) - 1)]
+    // Wq   = yTZW[., (3 + cols(Z))::cols(yTZW)]
 
     MW_yT  = sf_helper_annihilator(Wp, (yp, Tp))     // [y_⊥ T_⊥] = M_W [y T]
     MWD_yT = sf_helper_annihilator(Wq, (yq, Tq))     // [y_⊥ T_⊥] = M_W M_D [y T]
@@ -138,27 +149,26 @@ void function ManyIVreg_IM::fit(
     k    = (0, 1, min(Re(ei)), (1 - L/n) / (1 - (K - 1) / n - L/n))
     beta = (YY[1, 2] :- k :* YMY[1, 2]) :/ (YY[2, 2] :- k :* YMY[2, 2])
 
-// TODO: xx In general I need to add the diagonal of the HDE projection
-// matrix; I don't know atm how to get it if there is more than one
-// grouping variable, be them in Z, W, or some combination therein.
-
     // 2.2 JIVE, UJIVE
     ZW  = (Wq, Zq)
     DZW = rowsum((ZW * invsym(ZW' * ZW)) :* ZW) // D_{Z W} = diag(H_{Z W}) as a vector
     DW  = rowsum((Wp * invsym(Wp' * Wp)) :* Wp) // D_W     = diag(H_W) as a vector
 
-    if ( Absorb.nabsorb ) {
-        Absorb.encode()
-        D   = 1 :/ Absorb.nj(1)[Absorb.groupid(1)]
-        DZW = DZW + D
-        DW  = DW  + D
-    }
+// TODO: xx In general I need to add the diagonal of the HDE projection
+// matrix; I don't know atm how to get it if there is more than one
+// grouping variable, be them in Z, W, or some combination therein.
+// For now, I make the full design matrix of FE and get the diagonal.
 
-    if ( AbsorbIV.nabsorb ) {
-        AbsorbIV.encode()
-        D   = 1 :/ AbsorbIV.nj(1)[AbsorbIV.groupid(1)]
-        D[AbsorbIV.select(1, 1)] = J(AbsorbIV.nj(1)[1], 1, 0)
-        DZW = DZW + D
+    if ( (Absorb.nabsorb > 0) & (AbsorbIV.nabsorb > 0) ) {
+        DW  = DW  :+ Absorb.d_projection(1)
+        DZW = DZW :+ AbsorbIV.d_projection(1)
+    }
+    else if ( Absorb.nabsorb > 0 ) {
+        DW  = DW  :+ Absorb.d_projection(1)
+        DZW = DZW :+ Absorb.d_projection(1)
+    }
+    else if ( AbsorbIV.nabsorb > 0 ) {
+        DZW = DZW :+ AbsorbIV.d_projection(1)
     }
 
     iIDZW  = 1 :/ (1 :- DZW) // (I - D_{Z W})^{-1} as a vector

@@ -13,8 +13,9 @@ r2 <- IVreg(formula, data = ak80, inference = c("md"))
 ***********************************************************************
 
 set linesize 112
-cd ~/projects/ra/hull/manyiv/manyiv/src
+cd ~/projects/ra/hull/manyiv/stata-manyiv/src
 mata mata clear
+qui include ../src/manyiv_absorb.mata
 qui include ../src/manyiv_internals_m.mata
 qui include ../src/manyiv.ado
 use "/tmp/tmp.dta", clear
