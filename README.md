@@ -3,7 +3,7 @@ ManyIV
 
 Various instrumental variables regressions (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 
-`version 0.1.0 27Sep2021` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples)
+`version 0.3.0 30Oct2021` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples)
 
 ### Installation
 
@@ -44,11 +44,17 @@ gen u  = rnormal()
 gen z1 = rnormal()
 gen z2 = rnormal()
 gen e  = rnormal() + u
-gen c  = mod(_n, 10)
+gen c  = int(runiform() * 10)
+gen fe = int(runiform() * 15)
+gen iv = int(runiform() * 8)
 gen w  = rnormal()
-gen x  = 1 + z1 - z2 + u
-gen y  = 1 + x + w + e
+gen x  = 1 + 0.1 * z1 - 0.2 * z2 - 1/(1 + iv) + u
+gen y  = 1 + x + w + 1/(1 + fe) + e
 
 manyiv y (x = z1 z2) w
 manyiv y (x = z1 z2) w, cluster(c)
+manyiv y (x = z1 z2) w, absorb(fe) cluster(c)
+manyiv y (x = z1 z2) w, absorbiv(iv) cluster(c)
+manyiv y (x = z1 z2) w, absorb(fe) absorbiv(iv) cluster(c)
+manyiv y (x = .)     w, absorb(fe) absorbiv(iv) cluster(c)
 ```

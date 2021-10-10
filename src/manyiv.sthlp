@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.2.0 30Sep2021}{...}
+{* *! version 0.3.0 09Oct2021}{...}
 {viewerdialog manyiv "dialog manyiv"}{...}
 {vieweralsosee "[R] manyiv" "mansection R manyiv"}{...}
 {viewerjumpto "Syntax" "manyiv##syntax"}{...}
@@ -24,27 +24,35 @@ Run multiple IV regressions:
 {cmd:(}{it:endogenous}{cmd:=}{it:instruments}{cmd:)}
 [{it:exogenous}]
 {ifin}
-[{cmd:,} {opth save:results(str)} {opth cluster(varname)} {it:{help manyiv##table_options:options}}]
+[{cmd:,} {it:{help manyiv##table_options:options}}]
 
 {synoptset 18 tabbed}{...}
 {marker table_options}{...}
 {synopthdr}
 {synoptline}
-{synopt :{opth absorb(varname)}} Control to absorb as fixed effects (single variable at the moment).
+{synopt :{opth absorb(varlist)}} Controls to absorb as fixed effects.
 {p_end}
-{synopt :{opth absorbiv(varname)}} Instrument to absorb as fixed effects (single variable at the moment).
-{p_end}
-{synopt :{opth save:results(str)}} Save results into mata object.
+{synopt :{opth absorbiv(varlist)}} Instruments to absorb as fixed effects.
 {p_end}
 {synopt :{opth cluster(varname)}} ClusterSEs by variable.
 {p_end}
-{synopt :{opt nocons:tant}} Do not add constant (not yet tested).
+{synopt :{opt skipsingletons}} Skip singleton absorb groups.
+{p_end}
+{synopt :{opt keepsingletons}} Keep singleton absorb groups (jive/ujive not estimated with this option).
+{p_end}
+{synopt :{opth save:results(str)}} Save results into mata object.
+{p_end}
+{synopt :{opt noc:onstant}} Do not include constant.
+{p_end}
+{synopt :{opt nosmall}} Small-sample adjustmnt.
 {p_end}
 {synopt :{opt noprint}} Do not print table.
 {p_end}
 {synopt :{opt nose}} Do not compute se.
 {p_end}
 {synopt :{opt nostats}} Do not compute stats.
+{p_end}
+{synopt :{opt nosquarem}} No SQUAREM acceeration (multiple absorb only).
 {p_end}
 
 {p2colreset}{...}
@@ -83,11 +91,15 @@ sequence of Kolesar, Chetty, Friedman, Glaeser and Imbens (2011)
 {synoptset 20 tabbed}{...}
 {p2col 5 20 24 2: Scalars}{p_end}
 {synopt:{cmd:e(F)}}the first-stage F-statistic{p_end}
+{synopt:{cmd:e(small)}}small-sample adjustment{p_end}
+{synopt:{cmd:e(jive)}}jive/ujive estimated{p_end}
 
 {synoptset 20 tabbed}{...}
 {p2col 5 20 24 2: Matrices}{p_end}
 {synopt:{cmd:e(b)            }}Coefficient vector{p_end}
 {synopt:{cmd:e(se)           }}Matrix with SEs{p_end}
+{synopt:{cmd:e(rf)           }}Vector with reduced form (if non-absorb instruments){p_end}
+{synopt:{cmd:e(fs)           }}Vector with first stage (if non-absorb instruments){p_end}
 {synopt:{cmd:e(Omega)        }}Estimate of the reduced-form covariance matrix{p_end}
 {synopt:{cmd:e(Xi)           }}Estimate of XI{p_end}
 {synopt:{cmd:e(Sargan)       }}2-by-1 vector, with the first element equal to the Sargan test statistic and the second element equal to the p-value. (Missing for single instrument).{p_end}
@@ -101,17 +113,23 @@ sequence of Kolesar, Chetty, Friedman, Glaeser and Imbens (2011)
 {marker example}{...}
 {title:Examples}
 
-{phang2}{cmd:. clear                   }{p_end}
-{phang2}{cmd:. set seed 1729           }{p_end}
-{phang2}{cmd:. set obs 1000            }{p_end}
-{phang2}{cmd:. gen u  = rnormal()      }{p_end}
-{phang2}{cmd:. gen z1 = rnormal()      }{p_end}
-{phang2}{cmd:. gen z2 = rnormal()      }{p_end}
-{phang2}{cmd:. gen e  = rnormal() + u  }{p_end}
-{phang2}{cmd:. gen c  = mod(_n, 10)    }{p_end}
-{phang2}{cmd:. gen w  = rnormal()      }{p_end}
-{phang2}{cmd:. gen x  = 1 + z1 - z2 + u}{p_end}
-{phang2}{cmd:. gen y  = 1 + x + w + e  }{p_end}
+{phang2}{cmd:. clear                                            }{p_end}
+{phang2}{cmd:. set seed 1729                                    }{p_end}
+{phang2}{cmd:. set obs 1000                                     }{p_end}
+{phang2}{cmd:. gen u  = rnormal()                               }{p_end}
+{phang2}{cmd:. gen z1 = rnormal()                               }{p_end}
+{phang2}{cmd:. gen z2 = rnormal()                               }{p_end}
+{phang2}{cmd:. gen e  = rnormal() + u                           }{p_end}
+{phang2}{cmd:. gen c  = int(runiform() * 10)                    }{p_end}
+{phang2}{cmd:. gen fe = int(runiform() * 15)                    }{p_end}
+{phang2}{cmd:. gen iv = int(runiform() * 8)                     }{p_end}
+{phang2}{cmd:. gen w  = rnormal()                               }{p_end}
+{phang2}{cmd:. gen x  = 1 + 0.1 * z1 - 0.2 * z2 - 1/(1 + iv) + u}{p_end}
+{phang2}{cmd:. gen y  = 1 + x + w + 1/(1 + fe) + e              }{p_end}
 
-{phang2}{cmd:. manyiv y (x = z1 z2) w            }{p_end}
-{phang2}{cmd:. manyiv y (x = z1 z2) w, cluster(c)}{p_end}
+{phang2}{cmd:. manyiv y (x = z1 z2) w                                    }{p_end}
+{phang2}{cmd:. manyiv y (x = z1 z2) w, cluster(c)                        }{p_end}
+{phang2}{cmd:. manyiv y (x = z1 z2) w, absorb(fe) cluster(c)             }{p_end}
+{phang2}{cmd:. manyiv y (x = z1 z2) w, absorbiv(iv) cluster(c)           }{p_end}
+{phang2}{cmd:. manyiv y (x = z1 z2) w, absorb(fe) absorbiv(iv) cluster(c)}{p_end}
+{phang2}{cmd:. manyiv y (x = .)     w, absorb(fe) absorbiv(iv) cluster(c)}{p_end}

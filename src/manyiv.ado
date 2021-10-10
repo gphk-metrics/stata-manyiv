@@ -1,95 +1,172 @@
-*! version 0.2.0 30Sep2021
+*! version 0.3.0 09Oct2021
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Adapted for Stata from ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 
-* TODO: allow absorbiv with no instruments
-* TODO: absorb and absorbiv don't account for collinearity atm
-* TODO: number of instruments check does not account for absorbed instruments
-* TODO: detect repeated variables between absorb and varist (z or w varlist)
 capture program drop manyiv
-program manyiv, eclass sortpreserve
+program manyiv, eclass
     syntax anything(equalok) /// dependent_var covariates
            [if] [in] ,       /// subset
     [                        ///
         absorb(str)          /// Absorb controls
         absorbiv(str)        /// Absorb instruments
+        skipsingletons       /// skip singleton groups
+        keepsingletons       /// do not drop singleton groups
+        cluster(varname)     /// clustered SE
                              ///
         internals(str)       ///
         SAVEresults(str)     /// name of mata object to store results
                              ///
-        /// noCONStant       /// omit constant; a bit of a pain to account for
+        noConstant           /// omit constant
+        nosmall              /// omit small-sample adjustments
         noPRINTtable         /// do not print table
         nose                 /// omit standard errors
         nostats              /// omit additional statistics
-        cluster(varname)     /// clustered SE
+        nosquarem            /// do not use SQUAREM accelerator (multiple absorb only)
                              ///
     ]
 
     local estimatese    = ("`estimatese'"    == "")
     local estimatestats = ("`estimatestats'" == "")
+    local small         = ("`small'"         == "")
+    local cons          = ("`constant'"      == "")
+    local squarem       = ("`squarem'"       == "")
+
+    if ( "`absorb'"   != "" ) unab absorb:   `absorb'
+    if ( "`absorbiv'" != "" ) unab absorbiv: `absorbiv'
+
+    local problems: list absorb & absorbiv
+    if ( `"`problems'"' != `""' ) {
+        disp as error "{bf:warning:} included as both an exogenous variable and an instrument: `problems'"
+    }
+    local absorbiv: list absorbiv - absorb
 
     ***********************************************************************
     *                           Parse IV Syntax                           *
     ***********************************************************************
 
-    if !regexm(`"`anything'"', ".+\((.+=.+)\)") {
+    if !regexm(`"`anything' "', ".+\((.+=.+)\)[^\.]") {
         disp as err "Unable to parse IV syntax: depvar (endogenous = instrument) [exogenous]"
         exit 198
     }
 
-    local iveq   = regexr(regexs(1), "\(|\)", "")
-    local ivexog = trim(regexr("`anything'", "\(.+=.+\)", ""))
+    local iveq   = regexs(1)
+    local ivexog = trim(regexr("`anything' ", "\(.+=.+\)[^\.]", " "))
 
     gettoken ivdepvar ivexog: ivexog
     gettoken ivendog ivinst: iveq, p(=)
     gettoken _ ivinst: ivinst
+    local ivinst `ivinst'
 
     helper_syntax_error `ivdepvar', msg(dependent variable) plain
-    helper_syntax_error `ivinst',   msg(instrument variables)
     helper_syntax_error `ivendog',  msg(endogenous variables)
+    if ( inlist("`ivinst'", ".", "") ) {
+        if ( "`absorbiv'" == "" ) {
+            disp as err "no instruments specified"
+            exit 198
+        }
+        local ivinst ""
+    }
+    else helper_syntax_error `ivinst', msg(instrument variables)
 
     ***********************************************************************
     *                           Parse varlists                            *
     ***********************************************************************
 
+    tempname Y X Z W C A IV nsingletons addnsingletons onesingleton singleix singlecons tag
     local varlist `ivdepvar' `ivendog' `ivinst' `ivexog'
     marksample touse
 
-    tempname Y X Z W C A IV
-    fvexpand `ivexog'
-    local ivexog `r(varlist)'
+    * Note: Need this here to drop singletons
+    mata `A'  = ManyIVreg_Absorb_New(tokens(st_local("absorb")),   "`touse'", `squarem')
+    mata `IV' = ManyIVreg_Absorb_New(tokens(st_local("absorbiv")), "`touse'", `squarem')
+    mata `IV'.append(`A')
 
-    fvexpand `ivinst'
-    local ivinst `r(varlist)'
-    local ivinst: list ivinst - ivexog
+    scalar `nsingletons' = 0
+    scalar `singlecons'  = 0
+    if ( "`keepsingletons'`skipsingletons'" == "" ) {
+        scalar `addnsingletons' = 1
+        while ( `=scalar(`addnsingletons')' ) {
+            // method 1 drops singleton groups across absorb variables
+            // and re-indexes the internal index and encoded group IDs.
+            if ( `:list sizeof absorbiv' ) {
+                mata `IV'.dropsingletons(`singleix'=J(0, 1, .), 1)
+                mata `A'.dropfromindex(`singleix')
+            }
+            else {
+                mata `A'.dropsingletons(`singleix'=J(0, 1, .), 1)
+            }
 
+            mata st_numscalar("`addnsingletons'", rows(`singleix'))
+            scalar `nsingletons' = `nsingletons' + `addnsingletons'
+            if ( `=scalar(`addnsingletons')' ) {
+                mata `tag' = st_data(., "`touse'", "`touse'")
+                mata `tag'[`singleix'] = J(rows(`singleix'), 1, 0)
+                mata st_store(., "`touse'", "`touse'", `tag')
+            }
+        }
+        scalar `addnsingletons' = 0
+    }
+    else if ( "`skipsingletons'" != "" ) {
+        // method 2 flags singleton groups to be skipped
+        mata `IV'.dropsingletons(., 2)
+        mata `A'.dropsingletons(., 2)
+        mata st_numscalar("`onesingleton'", `IV'.onesingleton() | `A'.onesingleton())
+        mata st_numscalar("`singlecons'", `IV'.allhaveskip() & `A'.allhaveskip())
+        if ( `=scalar(`onesingleton')' ) {
+            disp as err "{bf:warning} jive/ujive unstable with -skipsingletons- and an absorb group has only one singleton"
+        }
+    }
+    else if ( "`keepsingletons'" != "" ) {
+        // method 3 only counts number of singletons
+        mata `IV'.dropsingletons(., 3)
+        mata `A'.dropsingletons(., 3)
+    }
+
+    if ( `=scalar(`nsingletons')' ) {
+        if ( `=scalar(`nsingletons')' > 1 ) local s s
+        local strnsingletons = trim("`:disp %21.0fc scalar(`nsingletons')'")
+        disp as txt "{bf:warning: will drop `strnsingletons' singleton group`s'}"
+    }
+
+    mata `C' = ManyIVreg_Absorb_New(tokens(st_local("cluster")), "`touse'", `squarem')
     mata `Y' = st_data(., "`ivdepvar'", "`touse'")
     mata `X' = st_data(., "`ivendog'",  "`touse'")
 
-    helper_strip_omitted `ivinst' if `touse',
-    mata `Z' = select(st_data(., "`ivinst'", "`touse'"), !st_matrix("r(omit)"))
-    local ivinst `r(varlist)'
+    fvexpand `ivexog'
+    local ivexog `r(varlist)'
+
+    if ( `:list sizeof ivinst' ) {
+        fvexpand `ivinst'
+        local ivinst `r(varlist)'
+        local ivinst: list ivinst - ivexog
+
+        helper_strip_omitted `ivinst' if `touse', `constant'
+        mata `Z' = select(st_data(., "`ivinst'", "`touse'"), !st_matrix("r(omit)"))
+        local ivinst `r(varlist)'
+    }
+    else {
+        mata `Z' = J(rows(`Y'), 0, .)
+    }
 
     if ( `:list sizeof ivexog' ) {
         helper_strip_omitted `ivexog' if `touse', `constant'
-        mata `W' = select(st_data(., "`ivexog'", "`touse'"), !st_matrix("r(omit)")), J(rows(`Y'), 1, 1)
+        mata `W' = select(st_data(., "`ivexog'", "`touse'"), !st_matrix("r(omit)"))
         local ivexog `r(varlist)'
     }
     else {
-        mata `W' = J(rows(`Y'), 1, 1)
+        mata `W' = J(rows(`Y'), 0, .)
     }
 
-    tempname kendog kinst
+    if ( `cons' & (("`absorb'" == "") | `=scalar(`singlecons')') ) {
+        mata `W' = `W', J(rows(`Y'), 1, 1)
+    }
+    else local cons = 0
+
+    tempname kendog
     mata: st_numscalar("`kendog'", cols(st_data(1, "`ivendog'")))
-    mata: st_numscalar("`kinst'",  cols(st_data(1, "`ivinst'")))
-
-    if ( scalar(`kinst') < scalar(`kendog') ) {
-        disp as error "Need at least as many instruments as endogenous variables"
-        exit 198
-    }
 
     if ( scalar(`kendog') != 1 ) {
-        disp as error "Only one endogenous variabe allowed (currently hard-coded)"
+        disp as error "Only one endogenous variabe allowed"
         exit 198
     }
 
@@ -134,6 +211,19 @@ program manyiv, eclass sortpreserve
         disp as error "{bf:warning:} included as both an exogenous variable and an instrument: `problems'"
     }
 
+    local problems
+    local ivallvars = `" `ivdepvar' `ivendog' `ivinst' `ivexog' "'
+    local ivallvars: subinstr local ivallvars " " "  "
+    foreach absvar in `absorb' `absorbiv' {
+        if ( strpos("`ivallvars'", " `absvar' ") ) {
+            local problems `problems' `absvar'
+        }
+    }
+
+    if ( `"`problems'"' != `""' ) {
+        disp as error "{bf:warning:} included as both absorb and non-absorb: `problems'"
+    }
+
     ***********************************************************************
     *                             Estimation                              *
     ***********************************************************************
@@ -145,33 +235,30 @@ program manyiv, eclass sortpreserve
     if "`ManyIVData'" == "" tempname ManyIVData
     if "`ManyIVreg'"  == "" tempname ManyIVreg
 
-    mata `A'  = New_ManyIVreg_Absorb(tokens(st_local("absorb")),   "`touse'")
-    mata `IV' = New_ManyIVreg_Absorb(tokens(st_local("absorbiv")), "`touse'")
-
-    if ("`cluster'" != "") {
-        tempvar clusterid
-        sort `cluster' `touse'
-        by `cluster' `touse': gen long `clusterid' = (_n == 1) & `touse'
-        replace `clusterid' = sum(`clusterid')
-        replace `clusterid' = . if !`touse'
-        mata `C' = st_data(., "`clusterid'",  "`touse'")
-    }
-    else mata `C' = .
-
     mata `ManyIVreg' = ManyIVreg_IM()
-    mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `C', `A', `IV')
+    mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `small', `cons', `C', `A', `IV')
     mata `ManyIVreg'.results("`beta'", "`se'")
 
     if ( "`printtable'" != "noprinttable" ) {
         mata `ManyIVreg'.print()
     }
 
+    tempname F Omega Xi Sargan CD rf fs jive
     ereturn post `beta', esample(`touse')
     if ( `estimatese' ) {
-        ereturn matrix se = `se'
+        ereturn matrix se    = `se'
+        ereturn scalar small = `small'
+    }
+    mata st_numscalar("`jive'", `ManyIVreg'.jive)
+    ereturn scalar jive = `jive'
+
+    if ( `:list sizeof ivinst' ) {
+        mata st_matrix("`rf'", `ManyIVreg'.RFS[.,1])
+        mata st_matrix("`fs'", `ManyIVreg'.RFS[.,2])
+        ereturn matrix rf  = `rf'
+        ereturn matrix fs  = `fs'
     }
 
-    tempname F Omega Xi Sargan CD
     mata st_numscalar("`F'", `ManyIVreg'.stats.F)
     ereturn scalar F = `F'
     if ( `estimatestats' ) {
@@ -227,8 +314,8 @@ program helper_strip_omitted, rclass
     return matrix omit =  `omit'
 end
 
-// cap findfile manyiv_absorb.mata
-// cap do `"`r(fn)'"'
-// 
-// cap findfile manyiv_internals_m.mata
-// cap do `"`r(fn)'"'
+* cap findfile manyiv_absorb.mata
+* cap do `"`r(fn)'"'
+*
+* cap findfile manyiv_internals_m.mata
+* cap do `"`r(fn)'"'
