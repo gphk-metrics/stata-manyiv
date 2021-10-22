@@ -38,6 +38,8 @@ class ManyIVreg_Absorb
     real scalar nlevels_combined
     real scalar nsingledrop
     real scalar nsingletons
+    real scalar d_computed
+    real colvector d_projection
 
     void new()
     void init()
@@ -67,6 +69,8 @@ class ManyIVreg_Absorb
     void dropfromindex()
     void skipsingletons()
     void flagredundant()
+    void exportc()
+    void importc()
 
     real matrix hdfe()
     void _hdfe()
@@ -96,6 +100,7 @@ void function ManyIVreg_Absorb::new()
     this.nlevels_combined = 0
     this.nsingledrop = 0
     this.nsingletons = 0
+    this.d_computed  = 0
 }
 
 void function ManyIVreg_Absorb::init(string vector _absorbvars, string scalar _touse, | real scalar _squarem)
@@ -229,13 +234,14 @@ void function ManyIVreg_Absorb::flagredundant(| real scalar skipredundant)
     if ( nabsorb < 2 ) {
         return
     }
+    else if ( d_computed ) {
+        // if d_computed then this was already done in importc
+    }
+    else if ( nabsorb > 2 ) {
+        errprintf("use the C++ plugin to compute the dof adjustment with more than 2 levels\n")
+        error(1234)
+    }
     else {
-// TODO: xx does not account for multiple FE
-        if ( nabsorb > 2 ) {
-            errprintf("redundant level detection with 2+ absorb vars not implemented\n")
-            return
-        }
-
         encode()
         if ( all(original) ) {
             refj = selectindex(max(nlevels) :== nlevels)[1]
@@ -276,9 +282,9 @@ void function ManyIVreg_Absorb::flagredundant(| real scalar skipredundant)
             D[selskip] = J(rows(selskip), 1, 0)
         }
 
-        // -----------------------------------------------
-        // This portion has to be modified for nabsorb > 2
-        // -----------------------------------------------
+        // ------------------------------------------
+        // This portion doesn't work with nabsorb > 2
+        // ------------------------------------------
         D12 = - D12 * (D12' :* D)
         for (i = 1; i <= nabsorb; i++) {
             if ( i == refj ) continue
@@ -291,9 +297,9 @@ void function ManyIVreg_Absorb::flagredundant(| real scalar skipredundant)
             D[selskip] = J(rows(selskip), 1, 0)
         }
         _diag(D12, diagonal(D12) + D)
-        // -----------------------------------------------
-        // This portion has to be modified for nabsorb > 2
-        // -----------------------------------------------
+        // ------------------------------------------
+        // This portion doesn't work with nabsorb > 2
+        // ------------------------------------------
 
         qrd(D12, ., R = .)
         D = abs(diagonal(R))
@@ -401,6 +407,7 @@ void function ManyIVreg_Absorb::dropfromindex(real colvector dropindex, | real s
     if ( args() == 1 ) reference = .
 
     encode()
+    order = J(nobs, 1, 0)
     for (j = (ncombined? 0: 1); j <= nabsorb; j++) {
         nl      = j? nlevels[j]: nlevels_combined
         info    = info(j)
@@ -413,7 +420,9 @@ void function ManyIVreg_Absorb::dropfromindex(real colvector dropindex, | real s
             selix  = info[sel, 1]
         }
         else {
-            order = order(index, 1)
+            // note: index has a 1 to nobs index so its sort order is unique
+            // order = order(index, 1)
+            order[index] = 1::nobs
             selix = order[dropindex]
         }
 
@@ -582,14 +591,17 @@ void function ManyIVreg_Absorb::append(class ManyIVreg_Absorb scalar Absorb)
 real colvector function ManyIVreg_Absorb::d_projection(| real scalar base)
 {
     real scalar i, j, jix, nskip
-    real matrix DD, M, S, invS, invSM, invSMM
-    real colvector D, ix, sel, gid, selskip
+    real matrix M, S, invS, invSM, invSMM
+    real colvector D, sel, gid, selskip
     real rowvector s_i
 
     if ( args() < 1 ) base = 0
 
     encode()
-    if ( nabsorb == 0 ) {
+    if ( d_computed ) {
+        return(d_projection)
+    }
+    else if ( nabsorb == 0 ) {
         return(0)
     }
     else if ( nabsorb == 1 ) {
@@ -630,7 +642,9 @@ real colvector function ManyIVreg_Absorb::d_projection(| real scalar base)
         }
         if ( any(skip(j)) ) {
             for(i = 1; i <= nlevels[j]; i++) {
-                if ( skip(j)[i] ) D[groupindex(j, i)] = J(nj(j)[i], 1, 0)
+                if ( skip(j)[i] ) {
+                    D[groupindex(j, i)] = J(nj(j)[i], 1, 0)
+                }
             }
         }
 
@@ -673,26 +687,11 @@ real colvector function ManyIVreg_Absorb::d_projection(| real scalar base)
             D = D + invSMM[groupid(j), i] - invS[groupid(jix), i] :* M[groupid(j), i]
         }
 
-        // printf("resource warning: creating the set of FE for the smaller absorb variable\n")
-        // (void) _demean(DD = designmatrix(groupid(jix)), j, base)
-        // D = D + rowsum((DD * invsym(DD' * DD)) :* DD)
-
         return(D)
     }
     else {
-// TODO: xx return the actually correct diagonal
-// TODO: xx does not account for skipping levels
-        return(J(nobs, 1, 0))
-        printf("resource warning: creating the full set of FE as temporary variables\n")
-        DD = J(nobs, 0, .)
-        for(j = 1; j <= nabsorb; j++) {
-            ix = selectindex((1::nlevels[j]) :!= base)
-            DD = DD, designmatrix(groupid(j))[., ix]
-            // NOTE: A base level is required for groups 2+ bc of collinearity
-            if ( args() < 1 ) base = 1
-        }
-        D = rowsum((DD * invsym(DD' * DD)) :* DD)
-        return(D)
+        errprintf("use the C++ plugin to compute the projection with more than 2 levels\n")
+        error(1234)
     }
 }
 
@@ -808,7 +807,7 @@ void function ManyIVreg_Absorb::_hdfe_fpi(real matrix X)
         error(1234)
     }
     else {
-        printf("hdfe convergence after %g projections (error = %5.3g)\n", i * nabsorb, dev)
+        printf("hdfe convergence (fpi) after %g projections (error = %5.3g)\n", i * nabsorb, dev)
     }
 }
 
@@ -857,7 +856,7 @@ void function ManyIVreg_Absorb::_hdfe_squarem(real matrix X)
         error(1234)
     }
     else {
-        printf("hdfe convergence after %g projections (error = %5.3g)\n", feval * nabsorb, dev)
+        printf("hdfe convergence (squarem) after %g projections (error = %5.3g)\n", feval * nabsorb, dev)
     }
 }
 
@@ -905,5 +904,50 @@ real scalar function ManyIVreg_Absorb::_demean(real matrix X, real scalar j, | r
         // dev = dev + sum(avg:^2)
     }
     return(dev)
+}
+
+void function ManyIVreg_Absorb::exportc(string scalar fname)
+{
+    real scalar j, fh
+    colvector C
+    encode()
+    fh = fopen(fname, "rw")
+    C = bufio()
+    fbufput(C, fh, "%4bu", nabsorb)
+    fbufput(C, fh, "%4bu", nobs)
+    for(j = 1; j <= nabsorb; j++) {
+        fbufput(C, fh, "%4bu", nlevels[j])
+    }
+    for(j = 1; j <= nabsorb; j++) {
+        fbufput(C, fh, "%4bu", index(j) :- 1)
+        fbufput(C, fh, "%4bu", groupid(j) :- 1)
+        fbufput(C, fh, "%4bu", ((info(j)[., 1] :- 1) \ nobs))
+        fbufput(C, fh, "%4bu", skip(j))
+    }
+    // printf("exported %g bytes\n",
+    //        4 * (2 + nabsorb + 2 * nabsorb * nobs + sum(nlevels) + nabsorb))
+    fclose(fh)
+}
+
+void function ManyIVreg_Absorb::importc(string scalar fname, | real scalar skipredundant)
+{
+    real colvector skipj
+    real scalar j, fh, nskip
+    colvector C
+    if ( args() < 2 ) skipredundant = 0
+    if ( any(original) ) df = sum(select(nlevels, original))
+
+    fh = fopen(fname, "r")
+    C = bufio()
+    d_projection = fbufget(C, fh, "%8z", nobs)'
+    for(j = 1; j <= nabsorb; j++) {
+        skipj = (fbufget(C, fh, "%4bu", nlevels[j]) :== 0)'
+        nskip = sum(skipj)
+        if ( original[j] ) df = df - (nskip? nskip: 1)
+        if ( skipredundant ) set_skip(j, (skip(j) :| skipj))
+    }
+    fclose(fh)
+
+    d_computed = 1
 }
 end

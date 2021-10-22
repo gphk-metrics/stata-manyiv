@@ -3,7 +3,7 @@ ManyIV
 
 Various instrumental variables regressions (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 
-`version 0.3.0 30Oct2021` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples)
+`version 0.3.0 09Oct2021` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples)
 
 ### Installation
 

@@ -88,10 +88,10 @@ void function ManyIVreg_IM::fit(
     cons          = _cons
     nabsorbed_w   = 0
     nabsorbed_z   = 0
-    jive          = (AbsorbIV.nabsorb <= 2) & (Absorb.nabsorb <= 2)
+    jive          = ((AbsorbIV.nabsorb <= 2) | AbsorbIV.d_computed) & ((Absorb.nabsorb <= 2) | Absorb.d_computed)
 
     if ( jive == 0 ) {
-        errprintf("jive/ujive with more than 2 absorb variables not implemented; will skip\n")
+        errprintf("jive/ujive will not be computed with more than 2 absorb groups\n")
     }
 
     if ( (AbsorbIV.nsingledrop < AbsorbIV.nsingletons) | (Absorb.nsingledrop < Absorb.nsingletons) ) {
@@ -118,17 +118,6 @@ void function ManyIVreg_IM::fit(
     // of interest and the instrument onto W's null space then use
     // univariate formulas.
 
-// TODO: xx In general the correct DoF adjustment would drop absorb
-// groups that are redundant. The tricky bit is that groups might be
-// redundant _across_ absorb variables (i.e. a group from the first
-// variable might be collinear with groups from the second and third
-// absorb variables jointly, but not individually). At present, this
-// does notaccount for that possibility.
-
-// TODO: xx You can same memory here using pointers; copy for now
-//
-// TODO: xx Flag redundant does not account for more than 2 absorb vars
-
     if ( Absorb.nabsorb ) {
         Absorb.flagredundant()
         nabsorbed_w = Absorb.df + !cons
@@ -138,7 +127,7 @@ void function ManyIVreg_IM::fit(
         wselix = cols(W)? (3 + cols(Z))::(2 + cols(Z) + cols(W)): J(0, 1, 0)
         coll   = sf_helper_licols(yTZW[., wselix], Absorb.hdfetol)
 
-// TODO: xx does this actually merits error? Perfectly projecting into
+// TODO: xx does this actually merit error? Perfectly projecting into
 // covariates might be something to allow. Otherwise don't omit y, T.
 //
 //
@@ -229,15 +218,6 @@ void function ManyIVreg_IM::fit(
         ZW  = (Wq, Zq)
         DZW = rowsum((ZW * invsym(ZW' * ZW)) :* ZW) // D_{Z W} = diag(H_{Z W}) as a vector
         DW  = rowsum((Wp * invsym(Wp' * Wp)) :* Wp) // D_W     = diag(H_W) as a vector
-
-// TODO: xx In general I need to add the diagonal of the HDE projection
-// matrix; I don't know atm how to get it if there is more than one
-// grouping variable, be them in Z, W, or some combination therein.
-// For now, I make the full design matrix of FE and get the diagonal.
-
-        if ( (Absorb.nabsorb > 2) | (AbsorbIV.nabsorb > 2) ) {
-            printf("WARNING: jive and ujive not correct with multiple absorb levels\n")
-        }
 
         if ( (Absorb.nabsorb > 0) & (AbsorbIV.nabsorb > 0) ) {
             DW  = DW  :+ Absorb.d_projection()

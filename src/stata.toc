@@ -1,2 +1,0 @@
-v 0.2.0
-p 'MANYIV': Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)

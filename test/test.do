@@ -15,9 +15,9 @@ r2 <- IVreg(formula, data = ak80, inference = c("md"))
 set linesize 112
 cd ~/projects/ra/hull/manyiv/stata-manyiv/src
 mata mata clear
-qui do ../src/manyiv_absorb.mata
-qui do ../src/manyiv_internals_m.mata
-qui do ../src/manyiv.ado
+qui do ../src/mata/manyiv_absorb.mata
+qui do ../src/mata/manyiv_internals.mata
+qui do ../src/ado/manyiv.ado
 use "/tmp/tmp.dta", clear
 manyiv lwage (education = i.yob##i.qob) i.yob, save(r0)
 

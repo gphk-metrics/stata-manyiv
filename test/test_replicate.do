@@ -3,9 +3,9 @@
 * net install manyiv, from(`c(pwd)'/../src/)
 *
 * mata mata clear
-* qui include ../src/manyiv_absorb.mata
-* qui include ../src/manyiv_internals_m.mata
-* qui include ../src/manyiv.ado
+* qui include ../src/mata/manyiv_absorb.mata
+* qui include ../src/mata/manyiv_internals_m.mata
+* qui include ../src/ado/manyiv.ado
 
 capture program drop main
 program main
@@ -17,6 +17,7 @@ program main
 
     global controls r_a_roundag_* homeflag2_neg1  income findex_std_neg1  revtotbl_tc_neg1  agcolthb_tc_neg1 mortin12_ind_neg1 trdbalnm_tc_neg1 autopv6_ind_neg1 autbalt_tc_neg1 revratio_tc_neg1  nonmortinq6_tc_neg1  missing_age_0 missing_neg1  missing_zip_income
     local var findex_0_4_std
+    set rmsg on
 
     ** Table 3, Column 2 and 3 of Row 1 (Panel A)
     ** Online Appendix Table 7, Column 5
@@ -25,6 +26,7 @@ program main
     manyiv `var' $controls (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id)
     manyiv `var' $controls (discharge = i.judge_id)  if sample == 1,  absorb(absorbid2) cluster(office_id)
     manyiv `var' $controls (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
+    manyiv `var' $controls (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge) _plugin_skip
 
     * ** Table 3, Column 2 and 3 of Row 1 (Panel A)
     * qui reghdfe `var' (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) vce(cluster office_id) old

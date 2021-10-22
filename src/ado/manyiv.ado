@@ -1,9 +1,32 @@
-*! version 0.3.0 09Oct2021
+*! version 0.4.0 21Oct2021
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Adapted for Stata from ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 
+* TODO: xx once you have tested out the projection:
+* TODO: xx 
+*       add a token to start and end of file xx with a check; if
+*       token at start and end doesn't match then spit out error
+*       "unable to compute d_projection using plugin; temporary
+*       file corrupted". Internal element can be called d_token or
+*       similar. String scalar.
+* TODO: xx 
+*       There is no need to do the full matrix for the collinearity
+*       check (I suspect the QR decomposition is the bottleneck).
+*       The design matrix for the first FE has no collinear columns,
+*       so you only need to check for the rest. See block LU decomp
+*       [here](https://en.wikipedia.org/wiki/Block_LU_decomposition)
+
 capture program drop manyiv
 program manyiv, eclass
+    if ( "`0'" == "_plugin_check" ) {
+        cap noi plugin call manyiv_plugin, `"_plugin_check"'
+        exit _rc
+    }
+
+    FreeTimer
+    local t99: copy local FreeTimer
+    manyiv_timer on `t99'
+
     syntax anything(equalok) /// dependent_var covariates
            [if] [in] ,       /// subset
     [                        ///
@@ -23,8 +46,11 @@ program manyiv, eclass
         nostats              /// omit additional statistics
         nosquarem            /// do not use SQUAREM accelerator (multiple absorb only)
                              ///
+        _plugin_skip         ///
+        _plugin_bench        ///
     ]
 
+    local benchmark     = ("`_plugin_bench'" != "")
     local estimatese    = ("`estimatese'"    == "")
     local estimatestats = ("`estimatestats'" == "")
     local small         = ("`small'"         == "")
@@ -72,9 +98,15 @@ program manyiv, eclass
     *                           Parse varlists                            *
     ***********************************************************************
 
-    tempname Y X Z W C A IV nsingletons addnsingletons onesingleton singleix singlecons tag
+    * 1. Touse from varlist
+    * ---------------------
+
+    tempname Y X Z W C A IV nsingletons addnsingletons onesingleton singleix singlecons nabsorb tag
     local varlist `ivdepvar' `ivendog' `ivinst' `ivexog'
     marksample touse
+
+    * 2. Drop singletons
+    * ------------------
 
     * Note: Need this here to drop singletons
     mata `A'  = ManyIVreg_Absorb_New(tokens(st_local("absorb")),   "`touse'", `squarem')
@@ -125,8 +157,34 @@ program manyiv, eclass
     if ( `=scalar(`nsingletons')' ) {
         if ( `=scalar(`nsingletons')' > 1 ) local s s
         local strnsingletons = trim("`:disp %21.0fc scalar(`nsingletons')'")
-        disp as txt "{bf:warning: will drop `strnsingletons' singleton group`s'}"
+        disp as txt "{bf:note: will drop `strnsingletons' singleton group`s'}"
     }
+
+    manyiv_timer info `t99' `"Steps 1 & 2. Parse variables; drop singletons"', prints(`benchmark')
+
+    * 3. Collinar fixed effects and diagonal of projection matrix
+    * -----------------------------------------------------------
+
+    tempfile info
+    mata st_numscalar("`nabsorb'", `IV'.nabsorb)
+    if ( (`=scalar(`nabsorb')' > 1) & ("`_plugin_skip'" == "") ) {
+        mata `IV'.exportc("`info'")
+        plugin call manyiv_plugin, `"`info'"' `"`_plugin_bench'"'
+        mata `IV'.importc("`info'")
+    }
+
+    mata st_numscalar("`nabsorb'", `A'.nabsorb)
+    if ( (`=scalar(`nabsorb')' > 1) & ("`_plugin_skip'" == "") ) {
+        mata `A'.exportc("`info'")
+        plugin call manyiv_plugin, `"`info'"' `"`_plugin_bench'"'
+        mata `A'.importc("`info'")
+    }
+    cap erase `"`info'"'
+
+    manyiv_timer info `t99' `"Step 3. Compute diagonal projection for FEs"', prints(`benchmark')
+
+    * 4. Variables to use in regressions
+    * ----------------------------------
 
     mata `C' = ManyIVreg_Absorb_New(tokens(st_local("cluster")), "`touse'", `squarem')
     mata `Y' = st_data(., "`ivdepvar'", "`touse'")
@@ -165,10 +223,12 @@ program manyiv, eclass
     tempname kendog
     mata: st_numscalar("`kendog'", cols(st_data(1, "`ivendog'")))
 
-    if ( scalar(`kendog') != 1 ) {
+    if ( `=scalar(`kendog')' != 1 ) {
         disp as error "Only one endogenous variabe allowed"
         exit 198
     }
+
+    manyiv_timer info `t99' `"Step 4. Variables to use in regression"', prints(`benchmark')
 
     * TODO: Decide whether to make hard errors or leave as warnings
     * -------------------------------------------------------------
@@ -238,6 +298,8 @@ program manyiv, eclass
     mata `ManyIVreg' = ManyIVreg_IM()
     mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `small', `cons', `C', `A', `IV')
     mata `ManyIVreg'.results("`beta'", "`se'")
+
+    manyiv_timer info `t99' `"Step 5. ManyIV fit"', prints(`benchmark') off
 
     if ( "`printtable'" != "noprinttable" ) {
         mata `ManyIVreg'.print()
@@ -314,8 +376,59 @@ program helper_strip_omitted, rclass
     return matrix omit =  `omit'
 end
 
+capture program drop FreeTimer
+program FreeTimer
+    qui {
+        timer list
+        local i = 99
+        while ( (`i' > 0) & ("`r(t`i')'" != "") ) {
+            local --i
+        }
+    }
+    c_local FreeTimer `i'
+end
+
+capture program drop manyiv_timer
+program manyiv_timer, rclass
+    syntax anything, [prints(int 0) end off]
+    tokenize `"`anything'"'
+    local what  `1'
+    local timer `2'
+    local msg   `"`3'; "'
+
+    * If timer is 0, then there were no free timers; skip this benchmark
+    if ( `timer' == 0 ) exit 0
+
+    if ( inlist("`what'", "start", "on") ) {
+        cap timer off `timer'
+        cap timer clear `timer'
+        timer on `timer'
+    }
+    else if ( inlist("`what'", "info") ) {
+        timer off `timer'
+        qui timer list
+        return scalar t`timer' = `r(t`timer')'
+        return local pretty`timer' = trim("`:di %21.4gc r(t`timer')'")
+        if ( `prints' ) di `"`msg'`:di trim("`:di %21.4gc r(t`timer')'")' seconds"'
+        timer off `timer'
+        timer clear `timer'
+        timer on `timer'
+    }
+
+    if ( "`end'`off'" != "" ) {
+        timer off `timer'
+        timer clear `timer'
+    }
+end
+
 * cap findfile manyiv_absorb.mata
 * cap do `"`r(fn)'"'
 *
-* cap findfile manyiv_internals_m.mata
+* cap findfile manyiv_internals.mata
 * cap do `"`r(fn)'"'
+
+if ( inlist("`c(os)'", "MacOSX") | strpos("`c(machine_type)'", "Mac") ) local c_os_ macosx
+else local c_os_: di lower("`c(os)'")
+
+cap program drop manyiv_plugin
+program manyiv_plugin, plugin using("manyiv_`c_os_'.plugin")

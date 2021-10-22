@@ -190,7 +190,8 @@ program consistency
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
     mata F1  = st_numscalar("e(F)")
-    manyiv y (x = z1 z2) w , absorbiv(iv) absorb(fe) cluster(c) skipsingletons
+    manyiv y (x = z1 z2) w , absorbiv(iv) absorb(fe) cluster(c) skipsingletons _plugin_skip
+    * manyiv y (x = z1 z2) w , absorbiv(iv) absorb(fe) cluster(c) skipsingletons
     mata b2  = st_matrix("e(b)")
     mata se2 = st_matrix("e(se)")
     mata F2  = st_numscalar("e(F)")
@@ -201,11 +202,17 @@ program consistency
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- editvalue(b1, 0, .))), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
     manyiv y (x = z1 z2) w, absorbiv(iv) absorb(fe) cluster(c)
+    manyiv y (x = z1 z2) w, absorbiv(iv) absorb(fe) cluster(c) _plugin_skip
     manyiv y (x = z1 z2) w, absorbiv(iv) absorb(fe) cluster(c) skipsingletons
+    manyiv y (x = z1 z2) w, absorbiv(iv) absorb(fe) cluster(c) skipsingletons _plugin_skip
     manyiv y (x = z1 z2) w, absorbiv(iv) absorb(fe) cluster(c) keepsingletons
+    manyiv y (x = z1 z2) w, absorbiv(iv) absorb(fe) cluster(c) keepsingletons _plugin_skip
     manyiv y (x = z1 z2) w if (fe != 8) | (_n == 1), absorbiv(iv) absorb(fe) cluster(c)
+    manyiv y (x = z1 z2) w if (fe != 8) | (_n == 1), absorbiv(iv) absorb(fe) cluster(c) _plugin_skip
     manyiv y (x = z1 z2) w if (fe != 8) | (_n == 1), absorbiv(iv) absorb(fe) cluster(c) skipsingletons
+    manyiv y (x = z1 z2) w if (fe != 8) | (_n == 1), absorbiv(iv) absorb(fe) cluster(c) skipsingletons _plugin_skip
     manyiv y (x = z1 z2) w if (fe != 8) | (_n == 1), absorbiv(iv) absorb(fe) cluster(c) keepsingletons
+    manyiv y (x = z1 z2) w if (fe != 8) | (_n == 1), absorbiv(iv) absorb(fe) cluster(c) keepsingletons _plugin_skip
 
     * Redundant
     replace iv = 10.5 if fe == 7
@@ -225,7 +232,8 @@ program consistency
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
     mata F1  = st_numscalar("e(F)")
-    manyiv y (x = z1 z2) w , absorbiv(iv) absorb(fe) cluster(c) skipsingletons
+    manyiv y (x = z1 z2) w , absorbiv(iv) absorb(fe) cluster(c) skipsingletons _plugin_skip
+    * manyiv y (x = z1 z2) w , absorbiv(iv) absorb(fe) cluster(c) skipsingletons
     mata b2  = st_matrix("e(b)")
     mata se2 = st_matrix("e(se)")
     mata F2  = st_numscalar("e(F)")
