@@ -26,7 +26,6 @@ program main
     manyiv `var' $controls (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id)
     manyiv `var' $controls (discharge = i.judge_id)  if sample == 1,  absorb(absorbid2) cluster(office_id)
     manyiv `var' $controls (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
-    manyiv `var' $controls (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge) _plugin_skip
 
     * ** Table 3, Column 2 and 3 of Row 1 (Panel A)
     * qui reghdfe `var' (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) vce(cluster office_id) old

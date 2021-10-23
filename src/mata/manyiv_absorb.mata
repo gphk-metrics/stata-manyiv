@@ -39,6 +39,7 @@ class ManyIVreg_Absorb
     real scalar nsingledrop
     real scalar nsingletons
     real scalar d_computed
+    real vector d_order
     real colvector d_projection
 
     void new()
@@ -915,14 +916,14 @@ void function ManyIVreg_Absorb::exportc(string scalar fname)
     C = bufio()
     fbufput(C, fh, "%4bu", nabsorb)
     fbufput(C, fh, "%4bu", nobs)
+
+    d_order = order(-colshape(nlevels, 1), 1)
+    fbufput(C, fh, "%4bu", nlevels[d_order])
     for(j = 1; j <= nabsorb; j++) {
-        fbufput(C, fh, "%4bu", nlevels[j])
-    }
-    for(j = 1; j <= nabsorb; j++) {
-        fbufput(C, fh, "%4bu", index(j) :- 1)
-        fbufput(C, fh, "%4bu", groupid(j) :- 1)
-        fbufput(C, fh, "%4bu", ((info(j)[., 1] :- 1) \ nobs))
-        fbufput(C, fh, "%4bu", skip(j))
+        fbufput(C, fh, "%4bu", index(d_order[j]) :- 1)
+        fbufput(C, fh, "%4bu", groupid(d_order[j]) :- 1)
+        fbufput(C, fh, "%4bu", ((info(d_order[j])[., 1] :- 1) \ nobs))
+        fbufput(C, fh, "%4bu", skip(d_order[j]))
     }
     // printf("exported %g bytes\n",
     //        4 * (2 + nabsorb + 2 * nabsorb * nobs + sum(nlevels) + nabsorb))
@@ -941,10 +942,10 @@ void function ManyIVreg_Absorb::importc(string scalar fname, | real scalar skipr
     C = bufio()
     d_projection = fbufget(C, fh, "%8z", nobs)'
     for(j = 1; j <= nabsorb; j++) {
-        skipj = (fbufget(C, fh, "%4bu", nlevels[j]) :== 0)'
+        skipj = (fbufget(C, fh, "%4bu", nlevels[d_order[j]]) :== 0)'
         nskip = sum(skipj)
-        if ( original[j] ) df = df - (nskip? nskip: 1)
-        if ( skipredundant ) set_skip(j, (skip(j) :| skipj))
+        if ( original[d_order[j]] ) df = df - (nskip? nskip: 1)
+        if ( skipredundant ) set_skip(d_order[j], (skip(d_order[j]) :| skipj))
     }
     fclose(fh)
 

@@ -1,5 +1,6 @@
 /*********************************************************************
  * Program: manyiv_d_projection.cpp
+ * Support: Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
  * Created: Tue Oct 19 18:34:49 EDT 2021
  * Updated: Thu Oct 21 23:25:47 EDT 2021
  * Purpose: Stata plugin to compute the diagonal of the projection
@@ -27,10 +28,13 @@ int WinMain()
 
 // Syntax
 //     plugin call manyiv, file [benchmark]
+// Errors
+//     1701 - Matrix inversion failed
+//     1702 - OOM
+//     1703 - Unable to export results back to Stata
 
 STDLL stata_call(int argc, char * argv[])
 {
-    ST_retcode rc;
     uint32_t benchmark;
     if ( strcmp(argv[0], "_plugin_check") == 0 ) {
         sf_printf("(note: manyiv_plugin v" MANYIV_VERSION " successfully loaded)\n");

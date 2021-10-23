@@ -2,7 +2,10 @@
 #define SF_HELPERS
 
 #include <time.h>
+#include <string.h>
 #include <inttypes.h>
+#include "stplugin.h"
+#include "sf_printf.h"
 
 void gf_count_range(
     uint32_t *groupid,

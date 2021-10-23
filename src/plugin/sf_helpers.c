@@ -1,4 +1,3 @@
-#include "sf_printf.h"
 #include "sf_helpers.h"
 
 void gf_count_range(

@@ -12,7 +12,6 @@ set linesize 112
 capture program drop main
 program main
     consistency
-    misc_checks
 end
 
 ***********************************************************************
@@ -242,6 +241,8 @@ program consistency
     mata max(abs(se2 :- se1))
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- editvalue(b1, 0, .))), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
+
+    misc_checks
     mata errors
 end
 

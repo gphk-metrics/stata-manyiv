@@ -1,7 +1,6 @@
 #ifndef MANYIV
 #define MANYIV
 
-#include <iostream>
 #include <fstream>
 #include <stdio.h>
 #include <stdlib.h>

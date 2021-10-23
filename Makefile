@@ -2,17 +2,20 @@
 # OS parsing
 
 ifeq ($(OS),Windows_NT)
-	OSFLAGS = -shared
+	OSFLAGS = -shared -fPIC
+	OSTRAIL = -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread
 	GCC = x86_64-w64-mingw32-g++.exe
 	OUT = src/build/manyiv_windows.plugin
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Linux)
 		OSFLAGS = -shared -fPIC -DSYSTEM=OPUNIX
+		OSTRAIL =
 		OUT = src/build/manyiv_unix.plugin
 	endif
 	ifeq ($(UNAME_S),Darwin)
 		OSFLAGS = -bundle -DSYSTEM=APPLEMAC
+		OSTRAIL =
 		OUT = src/build/manyiv_macosx.plugin
 	endif
 	GCC = g++
@@ -33,17 +36,12 @@ CFLAGS = -I $(EIGEN) -Wall -O3 $(OSFLAGS)
 ## Compile directory
 all: clean manyiv
 
-## Download latest OSX plugin
-osx_plugins:
-	wget https://raw.githubusercontent.com/mcaceresb/stata-manyiv/osx/manyiv_macosx.plugin
-	mv -f manyiv_macosx.plugin src/build/manyiv_macosx.plugin
-
 # ---------------------------------------------------------------------
 # Rules
 
 ## Compile manyiv plugin
 manyiv: src/plugin/manyiv.cpp src/plugin/stplugin.c
-	$(GCC) $(CFLAGS) -o $(OUT) $^
+	$(GCC) $(CFLAGS) -o $(OUT) $^ $(OSTRAIL)
 
 .PHONY: clean
 clean:

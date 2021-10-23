@@ -1,26 +1,25 @@
 *! version 0.4.0 21Oct2021
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
-*! Adapted for Stata from ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
+*! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
+*! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
 
-* TODO: xx once you have tested out the projection:
-* TODO: xx 
-*       add a token to start and end of file xx with a check; if
-*       token at start and end doesn't match then spit out error
+* Idea: xx Add a token to start and end of C++ file as a check;
+*       if token at start and end doesn't match then spit out error
 *       "unable to compute d_projection using plugin; temporary
 *       file corrupted". Internal element can be called d_token or
 *       similar. String scalar.
-* TODO: xx 
-*       There is no need to do the full matrix for the collinearity
-*       check (I suspect the QR decomposition is the bottleneck).
-*       The design matrix for the first FE has no collinear columns,
-*       so you only need to check for the rest. See block LU decomp
-*       [here](https://en.wikipedia.org/wiki/Block_LU_decomposition)
 
 capture program drop manyiv
 program manyiv, eclass
     if ( "`0'" == "_plugin_check" ) {
         cap noi plugin call manyiv_plugin, `"_plugin_check"'
         exit _rc
+    }
+    else {
+        cap plugin call manyiv_plugin, `"_plugin_check"'
+        if ( _rc ) {
+            local _plugin_skip_override _plugin_skip_override
+        }
     }
 
     FreeTimer
@@ -65,6 +64,13 @@ program manyiv, eclass
         disp as error "{bf:warning:} included as both an exogenous variable and an instrument: `problems'"
     }
     local absorbiv: list absorbiv - absorb
+
+    if ( "`_plugin_skip_override'" != "" ) {
+        local _plugin_skip _plugin_skip
+        if ( `:list sizeof absorb' + `:list sizeof absorbiv' > 2 ) {
+            disp as err "{bf:warning:} unable to load helper plugin; jive/ujive skipped with 3+ absorb levels"
+        }
+    }
 
     ***********************************************************************
     *                           Parse IV Syntax                           *
@@ -118,8 +124,8 @@ program manyiv, eclass
     if ( "`keepsingletons'`skipsingletons'" == "" ) {
         scalar `addnsingletons' = 1
         while ( `=scalar(`addnsingletons')' ) {
-            // method 1 drops singleton groups across absorb variables
-            // and re-indexes the internal index and encoded group IDs.
+            * method 1 drops singleton groups across absorb variables
+            * and re-indexes the internal index and encoded group IDs.
             if ( `:list sizeof absorbiv' ) {
                 mata `IV'.dropsingletons(`singleix'=J(0, 1, .), 1)
                 mata `A'.dropfromindex(`singleix')
@@ -139,7 +145,7 @@ program manyiv, eclass
         scalar `addnsingletons' = 0
     }
     else if ( "`skipsingletons'" != "" ) {
-        // method 2 flags singleton groups to be skipped
+        * method 2 flags singleton groups to be skipped
         mata `IV'.dropsingletons(., 2)
         mata `A'.dropsingletons(., 2)
         mata st_numscalar("`onesingleton'", `IV'.onesingleton() | `A'.onesingleton())
@@ -149,7 +155,7 @@ program manyiv, eclass
         }
     }
     else if ( "`keepsingletons'" != "" ) {
-        // method 3 only counts number of singletons
+        * method 3 only counts number of singletons
         mata `IV'.dropsingletons(., 3)
         mata `A'.dropsingletons(., 3)
     }
@@ -169,14 +175,16 @@ program manyiv, eclass
     mata st_numscalar("`nabsorb'", `IV'.nabsorb)
     if ( (`=scalar(`nabsorb')' > 1) & ("`_plugin_skip'" == "") ) {
         mata `IV'.exportc("`info'")
-        plugin call manyiv_plugin, `"`info'"' `"`_plugin_bench'"'
+        cap noi plugin call manyiv_plugin, `"`info'"' `"`_plugin_bench'"'
+        plugin_error_dispatcher `=_rc'
         mata `IV'.importc("`info'")
     }
 
     mata st_numscalar("`nabsorb'", `A'.nabsorb)
     if ( (`=scalar(`nabsorb')' > 1) & ("`_plugin_skip'" == "") ) {
         mata `A'.exportc("`info'")
-        plugin call manyiv_plugin, `"`info'"' `"`_plugin_bench'"'
+        cap noi plugin call manyiv_plugin, `"`info'"' `"`_plugin_bench'"'
+        plugin_error_dispatcher `=_rc'
         mata `A'.importc("`info'")
     }
     cap erase `"`info'"'
@@ -419,6 +427,15 @@ program manyiv_timer, rclass
         timer off `timer'
         timer clear `timer'
     }
+end
+
+capture program drop plugin_error_dispatcher
+program plugin_error_dispatcher
+    args rc
+    if `rc' == 1701 disp as err "plugin error: fixed effects matrix inversion failed"
+    if `rc' == 1702 disp as err "plugin error: unable to allocate plugin obbject (out of memory)"
+    if `rc' == 1703 disp as err "plugin error: unable to export results back to Stata from plugin"
+    exit `rc'
 end
 
 * cap findfile manyiv_absorb.mata
