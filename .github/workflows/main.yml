@@ -11,10 +11,11 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
-      - run: |
-        brew install gcc
-        brew install eigen
-        make all EIGEN=/usr/local/include/eigen3
+      - name: dependencies and compile 
+        run: |
+          brew install gcc
+          brew install eigen
+          make all EIGEN=/usr/local/include/eigen3
       - uses: mcaceresb/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
