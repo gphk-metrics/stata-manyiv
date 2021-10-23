@@ -16,8 +16,11 @@ jobs:
           brew install gcc
           brew install eigen
           make all EIGEN=/usr/local/include/eigen3
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: macosx-plugin
-          path: src/build/manyiv_macosx.plugin
+      - name: commit plugin
+        run: |
+          git config --global user.name 'Mauricio Caceres'
+          git config --global user.email 'mauricio.caceres.bravo@gmail.com'
+          git add src/build/manyiv_macosx.plugin
+          git commit -m "[Automated Commit] OSX plugin"
+          git push
+          shasum src/build/manyiv_macosx.plugin
