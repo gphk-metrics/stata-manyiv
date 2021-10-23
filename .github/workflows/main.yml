@@ -20,7 +20,7 @@ jobs:
         run: |
           git config --global user.name 'Mauricio Caceres'
           git config --global user.email 'mauricio.caceres.bravo@gmail.com'
-          git remote set-url origin https://x-access-token:${{ secrets.COMPILE_TOKEN }}@github.com/$GITHUB_REPOSITORY
+          git remote set-url origin git:${{ secrets.COMPILE_TOKEN }}@github.com:${{ github.repository }}.git
           git add src/build/manyiv_macosx.plugin
           git commit -m "[Automated Commit] OSX plugin"
           git push origin HEAD:workflows-compile-macosx
