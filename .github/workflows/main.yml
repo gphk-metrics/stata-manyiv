@@ -22,5 +22,5 @@ jobs:
           git config --global user.email 'mauricio.caceres.bravo@gmail.com'
           git add src/build/manyiv_macosx.plugin
           git commit -m "[Automated Commit] OSX plugin"
-          git push
+          git push origin HEAD:workflows-compile-macosx
           shasum src/build/manyiv_macosx.plugin
