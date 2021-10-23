@@ -17,14 +17,14 @@ git clone git@github.com:mcaceresb/stata-manyiv
 
 ```
 cap noi net uninstall manyiv
-net install manyiv, from(`c(pwd)'/stata-manyiv/src)
+net install manyiv, from(`c(pwd)'/stata-manyiv)
 ```
 
 If the repo were public, this can be installed directly from Stata:
 
 ```
 local github "https://raw.githubusercontent.com"
-net install manyiv, from(`github'/mcaceresb/stata-manyiv/master/src/)
+net install manyiv, from(`github'/mcaceresb/stata-manyiv/master/)
 ```
 
 ### Usage
@@ -73,5 +73,5 @@ Then open Stata from the current directory and run:
 
 ```
 cap ado uninstall manyiv
-net install manyiv, from(`c(pwd)'/src)
+net install manyiv, from(`c(pwd)')
 ```
