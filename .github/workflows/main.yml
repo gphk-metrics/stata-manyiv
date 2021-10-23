@@ -13,15 +13,16 @@ jobs:
       - uses: actions/checkout@v2
       - name: dependencies and compile 
         run: |
-          brew install gcc
           brew install eigen
           make all EIGEN=/usr/local/include/eigen3
+          shasum src/build/manyiv_macosx.plugin
+          ldd src/build/manyiv_macosx.plugin
       - name: commit plugin
         run: |
           git config --global user.name 'Mauricio Caceres'
           git config --global user.email 'mauricio.caceres.bravo@gmail.com'
-          git remote set-url origin git:${{ secrets.COMPILE_TOKEN }}@github.com:${{ github.repository }}.git
+          git remote set-url origin https://x-access-token:${{ secrets.COMPILE_TOKEN }}@github.com/${{ github.repository }}
           git add src/build/manyiv_macosx.plugin
           git commit -m "[Automated Commit] OSX plugin"
+          git fetch
           git push origin HEAD:workflows-compile-macosx
-          shasum src/build/manyiv_macosx.plugin
