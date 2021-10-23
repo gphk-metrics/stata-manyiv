@@ -1,0 +1,28 @@
+name: compile-macosx-plugin
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  build:
+    name: Compile MacOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: dependencies and compile 
+        run: |
+          brew install eigen
+          make all EIGEN=/usr/local/include/eigen3
+          shasum src/build/manyiv_macosx.plugin
+          otool -L src/build/manyiv_macosx.plugin
+      - name: commit plugin
+        run: |
+          git config --global user.name 'Mauricio Caceres'
+          git config --global user.email 'mauricio.caceres.bravo@gmail.com'
+          git remote set-url origin https://x-access-token:${{ secrets.COMPILE_TOKEN }}@github.com/${{ github.repository }}
+          git add src/build/manyiv_macosx.plugin
+          git commit -m "[Automated Commit] OSX plugin"
+          git fetch
+          git push -f origin HEAD:workflows-compile-macosx
