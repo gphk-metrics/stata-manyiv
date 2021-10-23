@@ -16,7 +16,7 @@ jobs:
           brew install gcc
           brew install eigen
           make all EIGEN=/usr/local/include/eigen3
-      - uses: mcaceresb/stata-manyiv@v2
+      - uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: src/build/manyiv_macosx.plugin
