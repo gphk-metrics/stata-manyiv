@@ -2,12 +2,12 @@
  * Program: manyiv_d_projection.cpp
  * Support: Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
  * Created: Tue Oct 19 18:34:49 EDT 2021
- * Updated: Thu Oct 21 23:25:47 EDT 2021
+ * Updated: Sun Nov 14 16:20:43 EST 2021
  * Purpose: Stata plugin to compute the diagonal of the projection
  *          matrix of the design matrix implied by a set of FE. Given
  *          the pattern of such a design matrix leverading the sparse
  *          structure hopefully minimizes the memory requirements.
- * Version: 0.1.0
+ * Version: 0.2.0
  *********************************************************************/
 
 #include "manyiv.h"
@@ -36,14 +36,17 @@ int WinMain()
 STDLL stata_call(int argc, char * argv[])
 {
     uint32_t benchmark;
-    if ( strcmp(argv[0], "_plugin_check") == 0 ) {
-        sf_printf("(note: manyiv_plugin v" MANYIV_VERSION " successfully loaded)\n");
-        return(0);
+    if ( argc ) {
+        if ( strcmp(argv[0], "_plugin_check") == 0 ) {
+            sf_printf("(note: manyiv_plugin v" MANYIV_VERSION " successfully loaded)\n");
+            return(0);
+        }
+        else if ( strcmp(argv[0], "_plugin_run") == 0 ) {
+            MANYIV_CHAR(fname, strlen(argv[1]) + 1);
+            strcpy(fname, argv[1]);
+            benchmark = strcmp(argv[2], "_plugin_bench") == 0;
+            return(sf_d_projection(fname, benchmark));
+        }
     }
-    else {
-        MANYIV_CHAR(fname, strlen(argv[0]) + 1);
-        strcpy(fname, argv[0]);
-        benchmark = strcmp(argv[1], "_plugin_bench") == 0;
-        return(sf_d_projection(fname, benchmark));
-    }
+    return(0);
 }

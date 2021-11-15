@@ -3,7 +3,7 @@ ManyIV
 
 Various instrumental variables regressions (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 
-`version 0.4.0 21Oct2021` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples) | [Compiling](#compiling)
+`version 0.5.0 14Nov2021` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples) | [Compiling](#compiling)
 
 ### Installation
 
@@ -20,7 +20,9 @@ cap noi net uninstall manyiv
 net install manyiv, from(`c(pwd)'/stata-manyiv)
 ```
 
-If the repo were public, this can be installed directly from Stata:
+(Change `stata-manyiv` if you download the package to a different
+folder; e.g. `stata-manyiv-main`.) Note if the repo were public, this
+could be installed directly from Stata:
 
 ```
 local github "https://raw.githubusercontent.com"

@@ -7,7 +7,7 @@
 #include <string.h>
 #include <inttypes.h>
 
-#define MANYIV_VERSION "0.1.0"
+#define MANYIV_VERSION "0.2.0"
 
 #define MANYIV_CHAR(cvar, len)    \
     char *cvar = new char[len]; \

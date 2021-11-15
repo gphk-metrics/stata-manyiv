@@ -98,6 +98,7 @@ void function ManyIVreg_Absorb::new()
     this.encoded   = 0
     this.squarem   = 0
     this.ncombined = 0
+    this.nobs      = 0
     this.nlevels_combined = 0
     this.nsingledrop = 0
     this.nsingletons = 0
@@ -239,7 +240,7 @@ void function ManyIVreg_Absorb::flagredundant(| real scalar skipredundant)
         // if d_computed then this was already done in importc
     }
     else if ( nabsorb > 2 ) {
-        errprintf("use the C++ plugin to compute the dof adjustment with more than 2 levels\n")
+        errprintf("SE incorrect; use the C++ plugin to compute the dof adjustment with more than 2 levels\n")
         error(1234)
     }
     else {
@@ -477,7 +478,7 @@ void function ManyIVreg_Absorb::dropfromindex(real colvector dropindex, | real s
     }
 
     total_nlevels = sum(nlevels)
-    nobs = nobs - rows(dropindex)
+    nobs = max((0, nobs - rows(dropindex)))
 }
 
 // Counting sort order given counts of number of repeated elements (assumes id is encoded)
@@ -794,6 +795,11 @@ void function ManyIVreg_Absorb::_hdfe(real matrix X, | real scalar base)
     }
 }
 
+// Note: In the past you tried breaking the iteration if the tolerance was
+//       achieved by any given _pair_ if fixed effects. This doesn't work;
+//       the easiest counter example is if fe2 is collinear with fe1 but fe3
+//       is not. Then the algorithm would incorrectly stop at fe2.
+
 // Note: This is basically fixed point iteration
 void function ManyIVreg_Absorb::_hdfe_fpi(real matrix X)
 {
@@ -826,12 +832,18 @@ void function ManyIVreg_Absorb::_hdfe_squarem(real matrix X)
     while ( i++ < maxiter ) {
         feval++
         dev = _hdfe_halperin(X1 = X)
-        if ( dev < hdfetol ) break
+        if ( dev < hdfetol ) {
+            X = X1
+            break
+        }
 
         feval++
         Q1  = X1 - X
         dev = _hdfe_halperin(X2 = X1)
-        if ( dev < hdfetol ) break
+        if ( dev < hdfetol ) {
+            X = X2
+            break
+        }
 
         // Form quadratic terms
         Q2  = X2 - X1
@@ -867,7 +879,6 @@ real scalar function ManyIVreg_Absorb::_hdfe_halperin(real matrix X)
     dev = 1
     for (j = 1; j <= nabsorb; j++) {
         dev = _demean(X, j)
-        if ( dev < hdfetol ) break
     }
     return(dev)
 }
@@ -878,11 +889,9 @@ real scalar function ManyIVreg_Absorb::_hdfe_halperin_symm(real matrix X)
     dev = 1
     for (j = 1; j <= nabsorb; j++) {
         dev = _demean(X, j)
-        if ( dev < hdfetol ) break
     }
     for (j = nabsorb - 1; j > 1; j--) {
         dev = _demean(X, j)
-        if ( dev < hdfetol ) break
     }
     return(dev)
 }

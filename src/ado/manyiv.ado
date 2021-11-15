@@ -1,4 +1,4 @@
-*! version 0.4.0 21Oct2021
+*! version 0.5.0 14Nov2021
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
@@ -9,8 +9,38 @@
 *       file corrupted". Internal element can be called d_token or
 *       similar. String scalar.
 
+* TODO: xx mata errors should exit te entire program, not just mata
+
+* TODO: xx after the above, add unit tests, including error checking
+*       and expected error exits and CLT sims for SEs.
+
+* TODO: xx It's not obvious how to detect collinearity (numerically);
+*       ask if this algorithm is OK:
+*       - QR decomposition
+*       - Diagonal entries of R matrix
+*       - Scale by largest element (if > 1)
+*       - Drop if below tolerance (max of 1e-12 and machine epsilon * nobs)
+
 capture program drop manyiv
 program manyiv, eclass
+
+    ***********************************************************************
+    *                            Plugin Check                             *
+    ***********************************************************************
+
+    if ( inlist("`c(os)'", "MacOSX") | strpos("`c(machine_type)'", "Mac") ) local c_os_ macosx
+    else local c_os_: di lower("`c(os)'")
+
+    local _plugin_file manyiv_`c_os_'.plugin
+    cap plugin call manyiv_plugin
+    if ( _rc ) {
+        local _plugin_notloaded _plugin_notloaded
+        cap findfile "`_plugin_file'"
+        if ( _rc ) {
+            local _plugin_filenotfound _plugin_filenotfound
+        }
+    }
+
     if ( "`0'" == "_plugin_check" ) {
         cap noi plugin call manyiv_plugin, `"_plugin_check"'
         exit _rc
@@ -21,6 +51,10 @@ program manyiv, eclass
             local _plugin_skip_override _plugin_skip_override
         }
     }
+
+    ***********************************************************************
+    *                           Actual Program                            *
+    ***********************************************************************
 
     FreeTimer
     local t99: copy local FreeTimer
@@ -65,10 +99,13 @@ program manyiv, eclass
     }
     local absorbiv: list absorbiv - absorb
 
-    if ( "`_plugin_skip_override'" != "" ) {
+    if ( "`_plugin_notloaded'`_plugin_skip_override'" != "" ) {
         local _plugin_skip _plugin_skip
         if ( `:list sizeof absorb' + `:list sizeof absorbiv' > 2 ) {
             disp as err "{bf:warning:} unable to load helper plugin; jive/ujive skipped with 3+ absorb levels"
+            if ( "`_plugin_filenotfound'" != "" ) {
+                disp as err "(plugin file '`_plugin_file'' not found; please check your installation)"
+            }
         }
     }
 
@@ -175,7 +212,7 @@ program manyiv, eclass
     mata st_numscalar("`nabsorb'", `IV'.nabsorb)
     if ( (`=scalar(`nabsorb')' > 1) & ("`_plugin_skip'" == "") ) {
         mata `IV'.exportc("`info'")
-        cap noi plugin call manyiv_plugin, `"`info'"' `"`_plugin_bench'"'
+        cap noi plugin call manyiv_plugin, `"_plugin_run"' `"`info'"' `"`_plugin_bench'"'
         plugin_error_dispatcher `=_rc'
         mata `IV'.importc("`info'")
     }
@@ -183,7 +220,7 @@ program manyiv, eclass
     mata st_numscalar("`nabsorb'", `A'.nabsorb)
     if ( (`=scalar(`nabsorb')' > 1) & ("`_plugin_skip'" == "") ) {
         mata `A'.exportc("`info'")
-        cap noi plugin call manyiv_plugin, `"`info'"' `"`_plugin_bench'"'
+        cap noi plugin call manyiv_plugin, `"_plugin_run"' `"`info'"' `"`_plugin_bench'"'
         plugin_error_dispatcher `=_rc'
         mata `A'.importc("`info'")
     }
@@ -201,19 +238,6 @@ program manyiv, eclass
     fvexpand `ivexog'
     local ivexog `r(varlist)'
 
-    if ( `:list sizeof ivinst' ) {
-        fvexpand `ivinst'
-        local ivinst `r(varlist)'
-        local ivinst: list ivinst - ivexog
-
-        helper_strip_omitted `ivinst' if `touse', `constant'
-        mata `Z' = select(st_data(., "`ivinst'", "`touse'"), !st_matrix("r(omit)"))
-        local ivinst `r(varlist)'
-    }
-    else {
-        mata `Z' = J(rows(`Y'), 0, .)
-    }
-
     if ( `:list sizeof ivexog' ) {
         helper_strip_omitted `ivexog' if `touse', `constant'
         mata `W' = select(st_data(., "`ivexog'", "`touse'"), !st_matrix("r(omit)"))
@@ -221,6 +245,19 @@ program manyiv, eclass
     }
     else {
         mata `W' = J(rows(`Y'), 0, .)
+    }
+
+    if ( `:list sizeof ivinst' ) {
+        fvexpand `ivinst'
+        local ivinst `r(varlist)'
+        local ivinst: list ivinst - ivexog
+
+        helper_strip_omitted `ivinst' if `touse', extra(`ivexog') `constant'
+        mata `Z' = select(st_data(., "`ivinst'", "`touse'"), !st_matrix("r(omit)"))
+        local ivinst `r(varlist)'
+    }
+    else {
+        mata `Z' = J(rows(`Y'), 0, .)
     }
 
     if ( `cons' & (("`absorb'" == "") | `=scalar(`singlecons')') ) {
@@ -313,7 +350,7 @@ program manyiv, eclass
         mata `ManyIVreg'.print()
     }
 
-    tempname F Omega Xi Sargan CD rf fs jive
+    tempname F Omega Xi Sargan CD rf fs jive kinst
     ereturn post `beta', esample(`touse')
     if ( `estimatese' ) {
         ereturn matrix se    = `se'
@@ -323,10 +360,19 @@ program manyiv, eclass
     ereturn scalar jive = `jive'
 
     if ( `:list sizeof ivinst' ) {
-        mata st_matrix("`rf'", `ManyIVreg'.RFS[.,1])
-        mata st_matrix("`fs'", `ManyIVreg'.RFS[.,2])
-        ereturn matrix rf  = `rf'
-        ereturn matrix fs  = `fs'
+        mata st_numscalar("`kinst'", rows(`ManyIVreg'.RFS))
+        if ( `=scalar(`kinst')' ) {
+            mata st_matrix("`rf'", `ManyIVreg'.RFS[.,1])
+            mata st_matrix("`fs'", `ManyIVreg'.RFS[.,2])
+            ereturn matrix rf = `rf'
+            ereturn matrix fs = `fs'
+        }
+        else {
+            disp as txt "{bf:warning:} unable to recover reduced form or first stage"
+            if ( `:list sizeof absorb' + `:list sizeof absorbiv' ) {
+                disp as txt "(instruments likely collinear with absorb levels)"
+            }
+        }
     }
 
     mata st_numscalar("`F'", `ManyIVreg'.stats.F)
@@ -368,16 +414,18 @@ end
 
 capture program drop helper_strip_omitted
 program helper_strip_omitted, rclass
-    syntax anything(equalok) [if], [*]
-    _rmcoll `anything' `if', expand `options'
+    syntax anything(equalok) [if], [extra(str) *]
+    _rmcoll `anything' `extra' `if', expand `options'
     local expanded `r(varlist)'
 
     tempname b omit
     matrix `b' = J(1, `:list sizeof expanded', .)
     matrix colnames `b' = `expanded'
+    matrix `b' = `b'[1,1..(`:list sizeof expanded' - `:list sizeof extra')]
+
     _ms_omit_info `b'
     matrix `omit' = r(omit)
-    mata st_local("varlist", invtokens(select(tokens("`expanded'"), !st_matrix("r(omit)"))))
+    mata st_local("varlist", invtokens(select(st_matrixcolstripe("`b'")[., 2]', !st_matrix("r(omit)"))))
 
     return local expanded: copy local expanded
     return local varlist:  copy local varlist
@@ -443,9 +491,12 @@ end
 *
 * cap findfile manyiv_internals.mata
 * cap do `"`r(fn)'"'
+*
+* cap findfile "manyiv_`c_os_'.plugin"
+* cap do `"`r(fn)'"'
 
 if ( inlist("`c(os)'", "MacOSX") | strpos("`c(machine_type)'", "Mac") ) local c_os_ macosx
 else local c_os_: di lower("`c(os)'")
 
 cap program drop manyiv_plugin
-program manyiv_plugin, plugin using("manyiv_`c_os_'.plugin")
+cap program manyiv_plugin, plugin using("manyiv_`c_os_'.plugin")

@@ -108,7 +108,7 @@ void function ManyIVreg_IM::fit(
     // Note: This is not really necessary bc I check there is at least one
     // instrument and there can be at most one exogenous variable. Take out?
     if ( (K + AbsorbIV.df) < cols(T) ) {
-        errprintf("need at least as many instruments (found %g) as endogenous variables (%g)",
+        errprintf("need at least as many instruments (found %g) as endogenous variables (%g)\n",
                   K + AbsorbIV.df, cols(T))
         error(198)
     }
@@ -125,19 +125,18 @@ void function ManyIVreg_IM::fit(
         yTZW   = Absorb.hdfe((y, T, Z, W))
         zselix = cols(Z)? 3::(2 + cols(Z)): J(0, 1, 0)
         wselix = cols(W)? (3 + cols(Z))::(2 + cols(Z) + cols(W)): J(0, 1, 0)
-        coll   = sf_helper_licols(yTZW[., wselix], Absorb.hdfetol)
+        coll   = sf_helper_licols(yTZW[., wselix], Absorb.hdfetol / n)
 
 // TODO: xx does this actually merit error? Perfectly projecting into
 // covariates might be something to allow. Otherwise don't omit y, T.
 //
-//
 //         if ( coll[1] == 0 ) {
-//             errprintf("dependent variable collinear with absorb groups")
+//             errprintf("dependent variable collinear with absorb groups\n")
 //             error(1234)
 //         }
 //
 //         if ( coll[2] == 0 ) {
-//             errprintf("endogenous variable of interest collinear with absorb groups")
+//             errprintf("endogenous variable of interest collinear with absorb groups\n")
 //             error(1234)
 //         }
 
@@ -161,7 +160,7 @@ void function ManyIVreg_IM::fit(
         yTZW   = AbsorbIV.hdfe((y, T, Z, select(W, selw)))
         zselix = cols(Z)? 3::(3 + cols(Z) - 1): J(0, 1, 0)
         wselix = any(selw)? (3 + cols(Z))::cols(yTZW): J(0, 1, 0)
-        coll   = sf_helper_licols(yTZW[., (zselix \ wselix)], AbsorbIV.hdfetol)
+        coll   = sf_helper_licols(yTZW[., (zselix \ wselix)], AbsorbIV.hdfetol / n)
 
 // TODO: xx ibid.
         yq   = yTZW[., 1]
@@ -177,7 +176,7 @@ void function ManyIVreg_IM::fit(
         // Account for collinear columns | instrument in RF and FS (only
         // needed of no absorb instruments)
         if ( Absorb.nabsorb ) {
-            coll = sf_helper_licols(yTZW[., (zselix \ wselix)], Absorb.hdfetol)
+            coll = sf_helper_licols(yTZW[., (zselix \ wselix)], Absorb.hdfetol / n)
             Zq   = cols(Z)? select(yTZW[., zselix], coll[zselix :- 2]): Z
             Wq   = cols(W)? select(yTZW[., wselix], coll[wselix :- 2]): Wp
 // TODO: xx ibid.
@@ -189,14 +188,23 @@ void function ManyIVreg_IM::fit(
         K = cols(Zq)
     }
 
-    MW_yT  = sf_helper_annihilator(Wp, (yp, Tp))         // [y_⊥ T_⊥] = M_W [y T]
-    MWD_yT = sf_helper_annihilator(Wq, (yq, Tq))         // [y_⊥ T_⊥] = M_W M_D [y T]
-    MWD_Z  = sf_helper_annihilator(Wq, Zq)               // Z_⊥ = M_W M_D Z
-    YY     = (MW_yT' * MW_yT)                            // [y_⊥ T_⊥]' [y_⊥ T_⊥] = [y T]' M_W [y T]
-    RFS    = sf_helper_solve(MWD_Z, MWD_yT)              // [solve(Z_⊥, y_⊥) solve(Z_⊥, T_⊥)] = Reduced form and First stage
-    HZ_yT  = (cols(Z)? MWD_Z * RFS: 0) :+ MW_yT - MWD_yT // H_{Z_⊥} [y_⊥ T_⊥]
-    YPY    = MW_yT' * HZ_yT                              // [y_⊥ T_⊥]' H_{Z_⊥} [y_⊥ T_⊥]
-    YMY    = YY - YPY                                    // [y_⊥ T_⊥]' M_{Z_⊥} [y_⊥ T_⊥]
+    if ( K < cols(T) ) {
+        errprintf("instruments collinear with absorb levels (only %g independent; need %g)\n", K, cols(T))
+        error(198)
+    }
+
+    if ( cols(Zq) < cols(Z) ) {
+        printf("(dropped %g collinear instruments)\n", cols(Z) - cols(Zq))
+    }
+
+    MW_yT  = sf_helper_annihilator(Wp, (yp, Tp))          // [y_⊥ T_⊥] = M_W [y T]
+    MWD_yT = sf_helper_annihilator(Wq, (yq, Tq))          // [y_⊥ T_⊥] = M_W M_D [y T]
+    MWD_Z  = sf_helper_annihilator(Wq, Zq)                // Z_⊥ = M_W M_D Z
+    YY     = (MW_yT' * MW_yT)                             // [y_⊥ T_⊥]' [y_⊥ T_⊥] = [y T]' M_W [y T]
+    RFS    = sf_helper_solve(MWD_Z, MWD_yT)               // [solve(Z_⊥, y_⊥) solve(Z_⊥, T_⊥)] = Reduced form and First stage
+    HZ_yT  = (cols(Zq)? MWD_Z * RFS: 0) :+ MW_yT - MWD_yT // H_{Z_⊥} [y_⊥ T_⊥]
+    YPY    = MW_yT' * HZ_yT                               // [y_⊥ T_⊥]' H_{Z_⊥} [y_⊥ T_⊥]
+    YMY    = YY - YPY                                     // [y_⊥ T_⊥]' M_{Z_⊥} [y_⊥ T_⊥]
 
     // 2.1 k-class: OLS, TSLS, LIML, MBTLS
     // Note: These are all coded as
@@ -313,7 +321,7 @@ void function ManyIVreg_IM::fit(
 
         clustered = cluster.nabsorb
         if ( clustered > 1 ) {
-            errprintf("multi-way clustering not implemented; will ignore")
+            errprintf("multi-way clustering not implemented; will ignore\n")
             clustered = 0
         }
         else if ( clustered ) {
@@ -427,8 +435,8 @@ void function ManyIVreg_IM::print()
     real scalar j, maxl
 
     printf("\n")
-    note_absw = nabsorbed_w? " (" + strtrim(sprintf("%21.0fc", nabsorbed_w)) + " absorbed)": ""
-    note_absz = nabsorbed_z? " (" + strtrim(sprintf("%21.0fc", nabsorbed_z)) + " absorbed)": ""
+    note_absw  = nabsorbed_w? " (" + strtrim(sprintf("%21.0fc", nabsorbed_w)) + " absorbed)": ""
+    note_absz  = nabsorbed_z? " (" + strtrim(sprintf("%21.0fc", nabsorbed_z)) + " absorbed)": ""
 
     maxl = max(strlen(betaLabels)) + 1
     if ( estimatese ) {
@@ -471,7 +479,7 @@ real matrix function sf_helper_annihilator(real matrix X, real matrix Y)
 
 real matrix function sf_helper_solve(real matrix X, real matrix Y)
 {
-    return((cols(X) & cols(Y))? (invsym(cross(X, X)) * cross(X, Y)): 0)
+    return((cols(X) & cols(Y))? (invsym(cross(X, X)) * cross(X, Y)): J(cols(X), cols(Y), 0))
 }
 
 real matrix function sf_helper_tsolve(real matrix X, real matrix Y)
@@ -481,13 +489,15 @@ real matrix function sf_helper_tsolve(real matrix X, real matrix Y)
 
 real rowvector function sf_helper_licols(real matrix X, | real scalar tol)
 {
+    real rowvector p
     real matrix R
     real colvector D
     if ( (cols(X) == 0) | (rows(X) == 0) ) return(J(1, 0, 0))
-    if ( args() < 2 ) tol = epsilon(rows(X))
+    if ( args() < 2 ) tol = 0
+    tol = max((tol, epsilon(rows(X))))
 
-    qrd(cross(X, X), ., R = .)
+    qrdp(cross(X, X), ., R = ., p = .)
     D = abs(diagonal(R))
-    return(rowshape((D :/ max(D)) :>= tol, 1))
+    return(rowshape((D[order(p', 1)] :/ max(1 \ D)) :>= tol, 1))
 }
 end

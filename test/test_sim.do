@@ -22,6 +22,7 @@ end
 
 capture program drop consistency
 program consistency
+
     clear
     set obs 1000
     gen u   = rnormal()
@@ -37,6 +38,8 @@ program consistency
     gen w2  = rnormal()
     gen x   = 1 + 0.1 * z1 - 0.2 * z2 - 1/(1 + iv * iv2) + u
     gen y   = 1 + x + w + 1/(1 + fe) - 1/(1 + fe2) + e
+    egen iviv = group(iv fe)
+    egen fefe = group(iv2 fe2)
 
     manyiv y (x = z1 z2), cluster(c)
     manyiv y (x = z1 z2), cluster(c) noc
@@ -164,6 +167,128 @@ program consistency
     mata errors = errors \ (++errow, max(abs(b3  :- b1)), max(abs(se3 :- se1)), max(abs(F3  :- F1)))
     mata errors = errors \ (++errow, max(abs(b4  :- b1)), max(abs(se4 :- se1)), max(abs(F4  :- F1)))
 
+    manyiv y (x = i.iv i.iv2) i.fe i.fe2, cluster(c)
+    mata b1  = st_matrix("e(b)")
+    mata se1 = st_matrix("e(se)")
+    mata F1  = st_numscalar("e(F)")
+    manyiv y (x = i.iv i.iv2) i.fe i.fe2, cluster(c) absorb(fe fe2)
+    mata b2  = st_matrix("e(b)")
+    mata se2 = st_matrix("e(se)")
+    mata F2  = st_numscalar("e(F)")
+    mata max(abs(editvalue(b2, 0, .) :- b1))
+    mata max(abs(se2 :- se1))
+    mata max(abs(F2  :- F1))
+    mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
+
+    manyiv y (x = i.iv i.iv2) i.fe i.fe2, cluster(c)
+    mata b1  = st_matrix("e(b)")
+    mata se1 = st_matrix("e(se)")
+    mata F1  = st_numscalar("e(F)")
+    manyiv y (x = i.iv i.iv2) i.fe i.fe2, cluster(c) absorbiv(iv)
+    mata b2  = st_matrix("e(b)")
+    mata se2 = st_matrix("e(se)")
+    mata F2  = st_numscalar("e(F)")
+    mata max(abs(editvalue(b2, 0, .) :- b1))
+    mata max(abs(se2 :- se1))
+    mata max(abs(F2  :- F1))
+    mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
+
+    manyiv y (x = i.iv i.iv2) i.fe i.fe2, cluster(c)
+    mata b1  = st_matrix("e(b)")
+    mata se1 = st_matrix("e(se)")
+    mata F1  = st_numscalar("e(F)")
+    manyiv y (x = i.iv i.iv2) i.fe i.fe2, cluster(c) absorbiv(iv2)
+    mata b2  = st_matrix("e(b)")
+    mata se2 = st_matrix("e(se)")
+    mata F2  = st_numscalar("e(F)")
+    mata max(abs(editvalue(b2, 0, .) :- b1))
+    mata max(abs(se2 :- se1))
+    mata max(abs(F2  :- F1))
+    mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
+
+    manyiv y (x = i.iv i.iv2) w, cluster(c)
+    mata b1  = st_matrix("e(b)")
+    mata se1 = st_matrix("e(se)")
+    mata F1  = st_numscalar("e(F)")
+    manyiv y (x = i.iv i.iv2) w, cluster(c) absorbiv(iv iv2)
+    mata b2  = st_matrix("e(b)")
+    mata se2 = st_matrix("e(se)")
+    mata F2  = st_numscalar("e(F)")
+    mata max(abs(editvalue(b2, 0, .) :- b1))
+    mata max(abs(se2 :- se1))
+    mata max(abs(F2  :- F1))
+    mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
+
+    manyiv y (x = z1 z2 i.iv i.iv2) w, cluster(c)
+    mata b1  = st_matrix("e(b)")
+    mata se1 = st_matrix("e(se)")
+    mata F1  = st_numscalar("e(F)")
+    manyiv y (x = z1 z2 i.iv i.iv2) w, cluster(c) absorbiv(iv iv2)
+    mata b2  = st_matrix("e(b)")
+    mata se2 = st_matrix("e(se)")
+    mata F2  = st_numscalar("e(F)")
+    mata max(abs(editvalue(b2, 0, .) :- b1))
+    mata max(abs(se2 :- se1))
+    mata max(abs(F2  :- F1))
+    mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
+
+    manyiv y (x = z1 z2 i.iv i.iv2) w i.fe i.fe2, cluster(c)
+    mata b1  = st_matrix("e(b)")
+    mata se1 = st_matrix("e(se)")
+    mata F1  = st_numscalar("e(F)")
+    manyiv y (x = z1 z2 i.iv i.iv2) w i.fe i.fe2, cluster(c) absorbiv(iv iv2) absorb(fe fe2)
+    mata b2  = st_matrix("e(b)")
+    mata se2 = st_matrix("e(se)")
+    mata F2  = st_numscalar("e(F)")
+    mata max(abs(editvalue(b2, 0, .) :- b1))
+    mata max(abs(se2 :- se1))
+    mata max(abs(F2  :- F1))
+    mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
+
+    manyiv y (x = z1 z2 i.iv i.iv2 i.iv#i.fe) w, cluster(c)
+    mata b1  = st_matrix("e(b)")
+    mata se1 = st_matrix("e(se)")
+    mata F1  = st_numscalar("e(F)")
+    manyiv y (x = z1 z2) w, cluster(c) absorbiv(iviv iv iv2)
+    mata b2  = st_matrix("e(b)")
+    mata se2 = st_matrix("e(se)")
+    mata F2  = st_numscalar("e(F)")
+    mata max(abs(editvalue(b2, 0, .) :- b1))
+    mata max(abs(se2 :- se1))
+    mata max(abs(F2  :- F1))
+    mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
+
+    * Note: The issue here is that the number of instruments is not
+    * determinate.  Different algorithms might drop different collinear
+    * variables and get the same result (such is the nature of collinear
+    * variables, sadly). There is nothing conceptually wrong, however.
+
+    * manyiv y (x = z1 z2 i.iv#i.fe) w i.fe i.fe2 i.iv2#i.fe2, cluster(c)
+    * mata b1  = st_matrix("e(b)")
+    * mata se1 = st_matrix("e(se)")
+    * mata F1  = st_numscalar("e(F)")
+    * manyiv y (x = z1 z2) w, cluster(c) absorbiv(iviv) absorb(fefe fe fe2)
+    * mata b2  = st_matrix("e(b)")
+    * mata se2 = st_matrix("e(se)")
+    * mata F2  = st_numscalar("e(F)")
+    * mata max(abs(editvalue(b2, 0, .) :- b1))
+    * mata max(abs(se2 :- se1))
+    * mata max(abs(F2  :- F1))
+    * mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
+
+    * manyiv y (x = z1 z2 i.iv#i.fe i.iv i.iv2) w i.iv2#i.fe2 i.fe i.fe2, cluster(c)
+    * mata b1  = st_matrix("e(b)")
+    * mata se1 = st_matrix("e(se)")
+    * mata F1  = st_numscalar("e(F)")
+    * manyiv y (x = z1 z2) w, cluster(c) absorbiv(iviv iv iv2) absorb(fefe fe fe2)
+    * mata b2  = st_matrix("e(b)")
+    * mata se2 = st_matrix("e(se)")
+    * mata F2  = st_numscalar("e(F)")
+    * mata max(abs(editvalue(b2, 0, .) :- b1))
+    * mata max(abs(se2 :- se1))
+    * mata max(abs(F2  :- F1))
+    * mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
+
     * Singletons
     replace fe = 99 in 10/11
     replace iv = 98 in 10
@@ -259,6 +384,8 @@ program misc_checks
     qui tab iv, gen(_iv)
     qui tab fe2, gen(_2fe)
     qui tab iv2, gen(_2iv)
+    qui tab iviv, gen(_civiv)
+    qui tab fefe, gen(_cfefe)
 
     ivregress 2sls y (x = z1 z2 i.ivid) w i.feid if fe != 1234, cluster(c) small
     manyiv y (x = z1 z2 i.ivid) w i.feid if fe != 1234, cluster(c)
@@ -279,6 +406,9 @@ program misc_checks
     cap noi jive y (x = z1 z2 _iv*) w, r
     cap noi jive y (x = z1 z2 _iv*) w _fe*, r
     cap noi jive y (x = _iv*), r
+
+    * manyiv y (x = z1 z2) w, cluster(c) absorbiv(iviv) absorb(fefe fe fe2)
+    * jive y (x = z1 z2 _civiv*) _cfefe* _fe* _2fe* w
 end
 
 main

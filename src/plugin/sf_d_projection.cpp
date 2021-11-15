@@ -51,11 +51,11 @@ ST_retcode sf_d_projection(char *fname, uint8_t benchmark)
             skip[k]      = (uint32_t *) calloc(nlevels[k], sizeof(*skip[k]));
             groupmask[k] = (uint32_t *) calloc(nlevels[k], sizeof(*groupmask[k]));
 
-            if ( index[k]     == NULL ) sf_oom_error("sf_d_projection", "index");
-            if ( groupid[k]   == NULL ) sf_oom_error("sf_d_projection", "groupid");
-            if ( info[k]      == NULL ) sf_oom_error("sf_d_projection", "info");
-            if ( skip[k]      == NULL ) sf_oom_error("sf_d_projection", "skip");
-            if ( groupmask[k] == NULL ) sf_oom_error("sf_d_projection", "groupmask");
+            if ( index[k]     == NULL ) return(sf_oom_error("sf_d_projection", "index"));
+            if ( groupid[k]   == NULL ) return(sf_oom_error("sf_d_projection", "groupid"));
+            if ( info[k]      == NULL ) return(sf_oom_error("sf_d_projection", "info"));
+            if ( skip[k]      == NULL ) return(sf_oom_error("sf_d_projection", "skip"));
+            if ( groupmask[k] == NULL ) return(sf_oom_error("sf_d_projection", "groupmask"));
         }
 
         for (k = 0; k < nabsorb; k++) {
@@ -84,9 +84,9 @@ ST_retcode sf_d_projection(char *fname, uint8_t benchmark)
         SparseMatrix<ST_double> ZZ(ktot, ktot);
         SparseMatrix<ST_double> A(nlevels[0], nlevels[0]);
 
-        if ( ncommon      == NULL ) sf_oom_error("sf_d_projection", "ncommon");
-        if ( d_projection == NULL ) sf_oom_error("sf_d_projection", "d_projection");
-        if ( indepix      == NULL ) sf_oom_error("sf_d_projection", "indepix");
+        if ( ncommon      == NULL ) return(sf_oom_error("sf_d_projection", "ncommon"));
+        if ( d_projection == NULL ) return(sf_oom_error("sf_d_projection", "d_projection"));
+        if ( indepix      == NULL ) return(sf_oom_error("sf_d_projection", "indepix"));
 
         if ( benchmark )
             sf_running_timer(&timer, "\tPlugin Step 1: Read info and allocate memory");
@@ -192,13 +192,13 @@ ST_retcode sf_d_projection(char *fname, uint8_t benchmark)
         /** /
         kindep = 0;
         maxr   = 0;
-        tol    = MANYIV_PWMAX(1e-12, numeric_limits<ST_double>::epsilon() * ktot);
+        tol    = MANYIV_PWMAX(1e-12, numeric_limits<ST_double>::epsilon() * nobs);
         for (i = 0; i < ktot; i++) {
             z = abs(R(i));
             if ( z > maxr ) maxr = z;
             Rsort(P(i)) = z;
         }
-        
+
         k = 0;
         j = 0;
         offseti = 0;
@@ -226,12 +226,13 @@ ST_retcode sf_d_projection(char *fname, uint8_t benchmark)
         /**/
         kindep = 0;
         maxr   = 0;
-        tol    = MANYIV_PWMAX(1e-12, numeric_limits<ST_double>::epsilon() * ktot);
+        tol    = MANYIV_PWMAX(1e-12, numeric_limits<ST_double>::epsilon() * nobs);
         for (i = 0; i < ktot - nlevelsindep[0]; i++) {
             z = abs(R(i));
             if ( z > maxr ) maxr = z;
             Rsort(P(i)) = z;
         }
+        maxr = MANYIV_PWMAX(1, maxr);
 
         j = 0;
         k = 0;

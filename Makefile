@@ -1,6 +1,14 @@
 # ---------------------------------------------------------------------
 # OS parsing
 
+# README.md
+# manyiv.pkg
+# stata.toc
+# src/ado/manyiv.ado
+# src/ado/manyiv.sthlp
+# src/plugin/manyiv.cpp
+# src/plugin/manyiv.h
+
 ifeq ($(OS),Windows_NT)
 	OSFLAGS = -shared -fPIC
 	OSTRAIL = -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread

@@ -24,8 +24,23 @@ program main
     ** (TSLS matches the commented out results below)
     manyiv `var'           (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id)
     manyiv `var' $controls (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id)
-    manyiv `var' $controls (discharge = i.judge_id)  if sample == 1,  absorb(absorbid2) cluster(office_id)
     manyiv `var' $controls (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
+    manyiv `var' $controls (discharge = i.judge_id)  if sample == 1,  absorb(absorbid2) cluster(office_id)
+
+    * Other results
+    * manyiv score_0_4           (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
+    * manyiv score_0_4 $controls (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
+    * manyiv score_0_4 $controls (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
+    * manyiv score_0_4           (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
+
+    * TODO xx you are here; make sepparate test file for new task I think? meh, but def have output be more automated
+    *
+    * Z = judge
+    * W = absorbid2
+    * excluded, Z, Z:W
+    * included, W
+    * gegen absorbid2_judge = group(absorbid2 judge)
+    * manyiv `var' $controls (discharge = .) if sample == 1, absorb(absorbid2) cluster(office_id) absorbiv(judge absorbid2_judge)
 
     * ** Table 3, Column 2 and 3 of Row 1 (Panel A)
     * qui reghdfe `var' (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) vce(cluster office_id) old

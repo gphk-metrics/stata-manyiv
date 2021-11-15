@@ -53,13 +53,13 @@ plugin call manyiv_plugin, `"_plugin_check"'
 
 mata IV.exportc("`info'")
 mata dtest = IV.d_projection()
-plugin call manyiv_plugin, `"`info'"' ""
+plugin call manyiv_plugin, `"_plugin_run"' `"`info'"' ""
 mata IV.importc("`info'")
 mata max(abs(dtest - IV.d_projection))
 
 mata A.exportc("`info'")
 mata dtest = A.d_projection()
-plugin call manyiv_plugin, `"`info'"' ""
+plugin call manyiv_plugin, `"_plugin_run"' `"`info'"' ""
 mata A.importc("`info'")
 mata max(abs(dtest - A.d_projection))
 
@@ -75,6 +75,6 @@ mata ZZ = DD' * DD
 mata dd = rowsum((DD * invsym(ZZ)) :* DD)
 
 mata B.exportc("`info'")
-plugin call manyiv_plugin, `"`info'"' ""
+plugin call manyiv_plugin, `"_plugin_run"' `"`info'"' ""
 mata B.importc("`info'")
 mata max(abs(dd - B.d_projection))
