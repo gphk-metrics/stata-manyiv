@@ -23,6 +23,7 @@
 
 capture program drop manyiv
 program manyiv, eclass
+    version 14.1
 
     ***********************************************************************
     *                            Plugin Check                             *
