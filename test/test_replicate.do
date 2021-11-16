@@ -9,13 +9,24 @@
 
 capture program drop main
 program main
+    load_data
+    replicate
+    manyoutcomes
+end
+
+capture program drop load_data
+program load_data
     global dropbox ~/Dropbox/GPH_ExaminerDesign/Applications/DGPY
     use "${dropbox}/Data/paulData",clear
     egen office_id = group(office)
     egen judge_id  = group(judge)
     qui prep_data
-
     global controls r_a_roundag_* homeflag2_neg1  income findex_std_neg1  revtotbl_tc_neg1  agcolthb_tc_neg1 mortin12_ind_neg1 trdbalnm_tc_neg1 autopv6_ind_neg1 autbalt_tc_neg1 revratio_tc_neg1  nonmortinq6_tc_neg1  missing_age_0 missing_neg1  missing_zip_income
+    gegen absorbid2_judge = group(absorbid2 judge)
+end
+
+capture program drop replicate
+program replicate
     local var findex_0_4_std
     set rmsg on
 
@@ -26,21 +37,6 @@ program main
     manyiv `var' $controls (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id)
     manyiv `var' $controls (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
     manyiv `var' $controls (discharge = i.judge_id)  if sample == 1,  absorb(absorbid2) cluster(office_id)
-
-    * Other results
-    * manyiv score_0_4           (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
-    * manyiv score_0_4 $controls (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
-    * manyiv score_0_4 $controls (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
-    * manyiv score_0_4           (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
-
-    * TODO xx you are here; make sepparate test file for new task I think? meh, but def have output be more automated
-    *
-    * Z = judge
-    * W = absorbid2
-    * excluded, Z, Z:W
-    * included, W
-    * gegen absorbid2_judge = group(absorbid2 judge)
-    * manyiv `var' $controls (discharge = .) if sample == 1, absorb(absorbid2) cluster(office_id) absorbiv(judge absorbid2_judge)
 
     * ** Table 3, Column 2 and 3 of Row 1 (Panel A)
     * qui reghdfe `var' (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) vce(cluster office_id) old
@@ -62,6 +58,64 @@ program main
     * local var  findex_0_4_std
     * qui reghdfe `var' $controls (discharge = j_*) if sample == 1  ,   absorb(absorbid2) vce(cluster office_id)  old
     * disp _b[discharge], _se[discharge]
+end
+
+capture program drop manyoutcomes
+program manyoutcomes
+    tempvar sumj obsj sumc obsc
+    gegen `sumj' = sum(discharge),   by(judge office)
+    gegen `obsj' = count(discharge), by(judge office)
+    gegen `sumc' = sum(discharge),   by(office) replace
+    gegen `obsc' = count(discharge), by(office) replace
+
+    * cap drop z_ij_pooled
+    gen z_ij_pooled_JIVE = (`sumj' - discharge) / (`obsj' - 1)
+    gen z_ij_pooled_IV   = `sumj' / `obsj'
+    * gen z_ij_pooled      = z_ij_pooled_JIVE - (`sumc' - discharge) / (`obsc' - 1)
+
+    local vars             ///
+        findex_0_4_std     ///
+        cur2gn12_ind_neg1  ///
+        collec12_ind_neg1  ///
+        chgoff12_ind_neg1  ///
+        bankin12_ind_neg1  ///
+        forecl12_ind_neg1  ///
+        jdgst12h_ind_neg1  ///
+        lien12_ind_neg1    ///
+        repo12_ind_neg1    ///
+        revtotbl_0_4_tc    ///
+        agcolthb_0_4_tc    ///
+        mortin12_ind_0_4   ///
+        trdbalnm_0_4_tc    ///
+        autopv6_ind_0_4    ///
+        autbalt_0_4_tc     ///
+        revratio_0_4_tc    ///
+        nonmortinq6_0_4_tc ///
+        score_0_4
+
+    local optsfe absorb(absorbid2) cluster(office_id) absorbiv(absorbid2_judge judge)
+    local opts   absorb(absorbid2) cluster(office_id)
+    mata out_pooled  = J(0, 6, .)
+    mata out_judgefe = J(0, 6, .)
+    mata out_iv      = J(0, 6, .)
+    mata out_jiv     = J(0, 6, .)
+    foreach var of local vars {
+        disp "`var'"
+        qui manyiv `var' (discharge = z_ij_pooled)      if sample == 1, save(res_pooled)  `opts'
+        qui manyiv `var' (discharge = .)                if sample == 1, save(res_judgefe) `optsfe'
+        qui manyiv `var' (discharge = z_ij_pooled_JIVE) if sample == 1, save(res_iv)      `opts'
+        qui manyiv `var' (discharge = z_ij_pooled_IV)   if sample == 1, save(res_jiv)     `opts'
+        // qui manyiv `var' $controls (discharge = z_ij_pooled)      if sample == 1, save(res_pooled)  `opts'
+        // qui manyiv `var' $controls (discharge = .)                if sample == 1, save(res_judgefe) `optsfe'
+        // qui manyiv `var' $controls (discharge = z_ij_pooled_JIVE) if sample == 1, save(res_iv)      `opts'
+        // qui manyiv `var' $controls (discharge = z_ij_pooled_IV)   if sample == 1, save(res_jiv)     `opts'
+        mata out_pooled  = out_pooled  \ rowshape((res_pooled.beta[(2 \ 5 \ 6)]', res_pooled.se[3, (2 \ 5 \ 6)]'), 1)
+        mata out_judgefe = out_judgefe \ rowshape((res_judgefe.beta[(2 \ 5 \ 6)]', res_judgefe.se[3, (2 \ 5 \ 6)]'), 1)
+        mata out_iv      = out_iv      \ rowshape((res_iv.beta[(2 \ 5 \ 6)]', res_iv.se[3, (2 \ 5 \ 6)]'), 1)
+        mata out_jiv     = out_jiv     \ rowshape((res_jiv.beta[(2 \ 5 \ 6)]', res_jiv.se[3, (2 \ 5 \ 6)]'), 1)
+    }
+
+    mata save_table("../misc/tables.txt", "varegs", (out_pooled, out_judgefe) \ (out_iv, out_jiv))
 end
 
 capture program drop prep_data
@@ -123,6 +177,29 @@ program define prep_data
     }
     egen findex_0_4_std = rowmean(findex_0_std findex_1_std findex_2_std findex_3_std findex_4_std)
     egen findex_5_7_std = rowmean(findex_5_std findex_6_std findex_7_std)
+end
+
+capture mata: mata drop save_table()
+mata:
+void function save_table(
+    string scalar output,
+    string scalar tag,
+    real matrix M)
+{
+    real scalar i, j, fh
+    string scalar fmt
+
+    fmt = "\t%21.9f"
+    fh  = fopen(output, "a")
+    fwrite(fh, sprintf("<tab:%s>\n", tag))
+    for(i = 1; i <= rows(M); i++) {
+        for(j = 1; j <= cols(M); j++) {
+            fwrite(fh, sprintf(fmt, M[i, j]))
+        }
+        fwrite(fh, sprintf("\n"))
+    }
+    fclose(fh)
+}
 end
 
 main
