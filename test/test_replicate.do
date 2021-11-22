@@ -18,8 +18,8 @@ capture program drop load_data
 program load_data
     global dropbox ~/Dropbox/GPH_ExaminerDesign/Applications/DGPY
     use "${dropbox}/Data/paulData",clear
-    egen office_id = group(office)
-    egen judge_id  = group(judge)
+    gegen office_id = group(office)
+    gegen judge_id  = group(judge)
     qui prep_data
     global controls r_a_roundag_* homeflag2_neg1  income findex_std_neg1  revtotbl_tc_neg1  agcolthb_tc_neg1 mortin12_ind_neg1 trdbalnm_tc_neg1 autopv6_ind_neg1 autbalt_tc_neg1 revratio_tc_neg1  nonmortinq6_tc_neg1  missing_age_0 missing_neg1  missing_zip_income
     gegen absorbid2_judge = group(absorbid2 judge)
@@ -62,16 +62,19 @@ end
 
 capture program drop manyoutcomes
 program manyoutcomes
-    tempvar sumj obsj sumc obsc
-    gegen `sumj' = sum(discharge),   by(judge office)
-    gegen `obsj' = count(discharge), by(judge office)
-    gegen `sumc' = sum(discharge),   by(office) replace
-    gegen `obsc' = count(discharge), by(office) replace
-
-    * cap drop z_ij_pooled
-    gen z_ij_pooled_JIVE = (`sumj' - discharge) / (`obsj' - 1)
-    gen z_ij_pooled_IV   = `sumj' / `obsj'
-    * gen z_ij_pooled      = z_ij_pooled_JIVE - (`sumc' - discharge) / (`obsc' - 1)
+    keep if sample == 1
+    gegen leniency_jive_sum    = sum(discharge),    by(judge)
+    gegen leniency_jive_n      = count(discharge),  by(judge)
+    gen leniency_iv            = leniency_jive_sum / leniency_jive_n
+    gen leniency_jive          = (leniency_jive_sum - discharge) / (leniency_jive_n - 1)
+    gegen leniency_oym_sum     = sum(discharge),   by(office year file_month)
+    gegen leniency_oym_n       = count(discharge), by(office year file_month)
+    gen leniency_ujive         = leniency_jive - (leniency_oym_sum - discharge) / (leniency_oym_n - 1)
+    gegen leniency_jive_w_sum  = sum(discharge),   by(judge office file_year file_month)
+    gegen leniency_jive_w_n    = count(discharge), by(judge office file_year file_month)
+    gen leniency_iv_w          = leniency_jive_w_sum / leniency_jive_w_n
+    gen leniency_jive_w        = (leniency_jive_w_sum - discharge) / (leniency_jive_w_n - 1)
+    gen leniency_ujive_w       = leniency_jive_w - (leniency_oym_sum - discharge) / (leniency_oym_n - 1)
 
     local vars             ///
         findex_0_4_std     ///
@@ -93,29 +96,39 @@ program manyoutcomes
         nonmortinq6_0_4_tc ///
         score_0_4
 
-    local optsfe absorb(absorbid2) cluster(office_id) absorbiv(absorbid2_judge judge)
-    local opts   absorb(absorbid2) cluster(office_id)
-    mata out_pooled  = J(0, 6, .)
-    mata out_judgefe = J(0, 6, .)
-    mata out_iv      = J(0, 6, .)
-    mata out_jiv     = J(0, 6, .)
+    local opts       absorb(absorbid2) cluster(office)
+    local judge_fe   `opts' absorbiv(judge)
+    local judge_fe_w `opts' absorbiv(absorbid2_judge judge)
+    mata out = J(0, 26, .)
     foreach var of local vars {
         disp "`var'"
-        qui manyiv `var' (discharge = z_ij_pooled)      if sample == 1, save(res_pooled)  `opts'
-        qui manyiv `var' (discharge = .)                if sample == 1, save(res_judgefe) `optsfe'
-        qui manyiv `var' (discharge = z_ij_pooled_JIVE) if sample == 1, save(res_iv)      `opts'
-        qui manyiv `var' (discharge = z_ij_pooled_IV)   if sample == 1, save(res_jiv)     `opts'
-        // qui manyiv `var' $controls (discharge = z_ij_pooled)      if sample == 1, save(res_pooled)  `opts'
-        // qui manyiv `var' $controls (discharge = .)                if sample == 1, save(res_judgefe) `optsfe'
-        // qui manyiv `var' $controls (discharge = z_ij_pooled_JIVE) if sample == 1, save(res_iv)      `opts'
-        // qui manyiv `var' $controls (discharge = z_ij_pooled_IV)   if sample == 1, save(res_jiv)     `opts'
-        mata out_pooled  = out_pooled  \ rowshape((res_pooled.beta[(2 \ 5 \ 6)]', res_pooled.se[3, (2 \ 5 \ 6)]'), 1)
-        mata out_judgefe = out_judgefe \ rowshape((res_judgefe.beta[(2 \ 5 \ 6)]', res_judgefe.se[3, (2 \ 5 \ 6)]'), 1)
-        mata out_iv      = out_iv      \ rowshape((res_iv.beta[(2 \ 5 \ 6)]', res_iv.se[3, (2 \ 5 \ 6)]'), 1)
-        mata out_jiv     = out_jiv     \ rowshape((res_jiv.beta[(2 \ 5 \ 6)]', res_jiv.se[3, (2 \ 5 \ 6)]'), 1)
-    }
+        qui manyiv `var' (discharge = leniency_iv)      if sample == 1, save(res_iv)      `opts'
+        qui manyiv `var' (discharge = leniency_jive)    if sample == 1, save(res_jive)    `opts'
+        qui manyiv `var' (discharge = leniency_ujive)   if sample == 1, save(res_ujive)   `opts'
+        qui manyiv `var' (discharge = .)                if sample == 1, save(res_fe)      `judge_fe'
+        qui manyiv `var' (discharge = leniency_iv_w)    if sample == 1, save(res_iv_w)    `opts'
+        qui manyiv `var' (discharge = leniency_jive_w)  if sample == 1, save(res_jive_w)  `opts'
+        qui manyiv `var' (discharge = leniency_ujive_w) if sample == 1, save(res_ujive_w) `opts'
+        qui manyiv `var' (discharge = .)                if sample == 1, save(res_fe_w)    `judge_fe_w'
 
-    mata save_table("../misc/tables.txt", "varegs", (out_pooled, out_judgefe) \ (out_iv, out_jiv))
+        mata row =
+             res_iv.beta[1]      , res_iv.se[3, 1]     ,
+             res_iv.beta[2]      , res_iv.se[3, 2]     ,
+             res_jive.beta[2]    , res_jive.se[3, 2]   ,
+             res_ujive.beta[2]   , res_ujive.se[3, 2]  ,
+             res_fe.beta[2]      , res_fe.se[3, 2]     ,
+             res_fe.beta[5]      , res_fe.se[3, 5]     ,
+             res_fe.beta[6]      , res_fe.se[3, 6]     ,
+             res_iv_w.beta[2]    , res_iv_w.se[3, 2]   ,
+             res_jive_w.beta[2]  , res_jive_w.se[3, 2] ,
+             res_ujive_w.beta[2] , res_ujive_w.se[3, 2],
+             res_fe_w.beta[2]    , res_fe_w.se[3, 2]   ,
+             res_fe_w.beta[5]    , res_fe_w.se[3, 5]   ,
+             res_fe_w.beta[6]    , res_fe_w.se[3, 6]
+        mata out = out \ row
+    }
+    mata reix = colshape(rowshape(1::(2 * `:list sizeof vars')', 2)', 1)
+    mata save_table("../misc/tables.txt", "varegs", colshape(colshape(out, 2)', 13)[reix, .])
 end
 
 capture program drop prep_data
