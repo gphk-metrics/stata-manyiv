@@ -16,7 +16,7 @@ end
 
 capture program drop load_data
 program load_data
-    global dropbox ~/Dropbox/GPH_ExaminerDesign/Applications/DGPY
+    global dropbox ~/Dropbox/Papers/GPH_ExaminerDesign/Applications/DGPY
     use "${dropbox}/Data/paulData",clear
     gegen office_id = group(office)
     gegen judge_id  = group(judge)
@@ -96,13 +96,17 @@ program manyoutcomes
         nonmortinq6_0_4_tc ///
         score_0_4
 
+    local vars findex_0_4_std revtotbl_0_4_tc agcolthb_0_4_tc mortin12_ind_0_4 trdbalnm_0_4_tc autopv6_ind_0_4 autbalt_0_4_tc  revratio_0_4_tc  nonmortinq6_0_4_tc
+    local appendix_vars deadflag2_cum_4 rellien_0_4 paidjudg_0_4 unpdjudg_0_4 paidcol_0_4 unpdcol_0_4 colm12h_0_4 cmop4up_0_4 cmop5up_0_4 studact2_0_4 studdef2_0_4
+
     local opts       absorb(absorbid2) cluster(office)
     local judge_fe   `opts' absorbiv(judge)
     local judge_fe_w `opts' absorbiv(absorbid2_judge judge)
-    mata out = J(0, 26, .)
+    mata out = J(0, 28, .)
     foreach var of local vars {
         disp "`var'"
         qui manyiv `var' (discharge = leniency_iv)      if sample == 1, save(res_iv)      `opts'
+        qui manyiv `var' (discharge = z_ij_pooled)      if sample == 1, save(res_ujive2)      `opts'
         qui manyiv `var' (discharge = leniency_jive)    if sample == 1, save(res_jive)    `opts'
         qui manyiv `var' (discharge = leniency_ujive)   if sample == 1, save(res_ujive)   `opts'
         qui manyiv `var' (discharge = .)                if sample == 1, save(res_fe)      `judge_fe'
@@ -113,6 +117,7 @@ program manyoutcomes
 
         mata row =
              res_iv.beta[1]      , res_iv.se[3, 1]     ,
+             res_ujive2.beta[2]  , res_ujive2.se[3, 2] ,
              res_iv.beta[2]      , res_iv.se[3, 2]     ,
              res_jive.beta[2]    , res_jive.se[3, 2]   ,
              res_ujive.beta[2]   , res_ujive.se[3, 2]  ,
@@ -127,8 +132,39 @@ program manyoutcomes
              res_fe_w.beta[6]    , res_fe_w.se[3, 6]
         mata out = out \ row
     }
+
     mata reix = colshape(rowshape(1::(2 * `:list sizeof vars')', 2)', 1)
-    mata save_table("../misc/tables.txt", "varegs", colshape(colshape(out, 2)', 13)[reix, .])
+    mata save_table("../misc/tables.txt", "varegs", colshape(colshape(out, 2)', 14)[reix, .])
+
+	** FROM PAUL: save file for graph
+	mata st_matrix("output", out)
+	preserve
+	foreach x of local vars {
+		sum `x' if discharge==0
+		local sd_`x' = r(sd)
+	}
+	clear
+	svmat output
+	gen varname = ""
+	gen sd = .
+	local i = 1
+	foreach x of local vars {
+		replace varname = "`x'" if _n == `i'
+		replace sd = `sd_`x'' if _n == `i'
+		local i = `i' + 1
+	}
+	local i = 5
+	foreach w in no_w w {
+		foreach est_type in iv jive ujive iv_fe jive_fe ujive_fe {
+			foreach coef in beta se {
+				rename output`i' `coef'_`est_type'_`w'
+				local i = `i' + 1
+			}
+			gen t_`est_type'_`w' = beta_`est_type'_`w' / se_`est_type'_`w'
+		}
+	}
+	outsheet using ../misc/graph_input.csv, comma replace names
+
 end
 
 capture program drop prep_data
