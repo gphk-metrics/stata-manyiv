@@ -11,7 +11,9 @@ capture program drop main
 program main
     load_data
     replicate
+
     manyoutcomes
+    manyoutcomes_export
 end
 
 capture program drop load_data
@@ -59,6 +61,9 @@ program replicate
     * qui reghdfe `var' $controls (discharge = j_*) if sample == 1  ,   absorb(absorbid2) vce(cluster office_id)  old
     * disp _b[discharge], _se[discharge]
 end
+
+* ---------------------------------------------------------------------
+* Coefficient comparison
 
 capture program drop manyoutcomes
 program manyoutcomes
@@ -133,39 +138,65 @@ program manyoutcomes
         mata out = out \ row
     }
 
+    gstats tab `vars', s(sd) mata(sd)
     mata reix = colshape(rowshape(1::(2 * `:list sizeof vars')', 2)', 1)
     mata save_table("../misc/tables.txt", "varegs", colshape(colshape(out, 2)', 14)[reix, .])
-
-	** FROM PAUL: save file for graph
-	mata st_matrix("output", out)
-	preserve
-	foreach x of local vars {
-		sum `x' if discharge==0
-		local sd_`x' = r(sd)
-	}
-	clear
-	svmat output
-	gen varname = ""
-	gen sd = .
-	local i = 1
-	foreach x of local vars {
-		replace varname = "`x'" if _n == `i'
-		replace sd = `sd_`x'' if _n == `i'
-		local i = `i' + 1
-	}
-	local i = 5
-	foreach w in no_w w {
-		foreach est_type in iv jive ujive iv_fe jive_fe ujive_fe {
-			foreach coef in beta se {
-				rename output`i' `coef'_`est_type'_`w'
-				local i = `i' + 1
-			}
-			gen t_`est_type'_`w' = beta_`est_type'_`w' / se_`est_type'_`w'
-		}
-	}
-	outsheet using ../misc/graph_input.csv, comma replace names
-
 end
+
+capture program drop manyoutcomes_export
+program manyoutcomes_export
+    preserve
+        clear
+        mata stata(sprintf("set obs %g", rows(out)))
+
+        local varname `"."'                      ///
+                      `"Financial Strain Index"' ///
+                      `"Revolving Balance"'      ///
+                      `"Collection Balance"'     ///
+                      `"Have a Mortgage"'        ///
+                      `"Mortgage Balance"'       ///
+                      `"Have an Auto Loan"'      ///
+                      `"Auto Balance"'           ///
+                      `"Revolving Utilization"'  ///
+                      `"Non-Mortgage Inquiries"'
+
+        mata varname = tokens(st_local("varname"))[2::`:list sizeof varname']
+        mata st_addvar(sprintf("str%g", max(strlen(varname))), "varname")
+        mata (void) st_sstore(., "varname", varname')
+
+        mata st_addvar("`:set type'", "sd")
+        mata (void) st_store(., "sd", sd.output)
+
+        local types iv jive ujive iv_fe jive_fe ujive_fe
+        local varnames
+        foreach est_type in ols paper_no_w {
+            local varnames `varnames' beta_`est_type' se_`est_type'
+        }
+
+        foreach w in no_w w {
+            foreach est_type of local types {
+                local varnames `varnames' beta_`est_type'_`w' se_`est_type'_`w'
+            }
+        }
+
+        mata (void) st_addvar(J(1, cols(out), "`:set type'"), tokens("`varnames'"))
+        mata st_store(., tokens("`varnames'"), out)
+
+        foreach est_type in ols paper_no_w {
+            gen t_`est_type' = beta_`est_type' / se_`est_type'
+        }
+
+        foreach w in no_w w {
+            foreach est_type of local types {
+                gen t_`est_type'_`w' = beta_`est_type'_`w' / se_`est_type'_`w'
+            }
+        }
+        outsheet using "../misc/graph_input.csv", comma replace names
+    restore
+end
+
+* ---------------------------------------------------------------------
+* Replication
 
 capture program drop prep_data
 program define prep_data
