@@ -5,9 +5,9 @@ set linesize 112
 * net install manyiv, from(`c(pwd)'/../src/)
 *
 * mata mata clear
-* qui include ../src/manyiv_absorb.mata
-* qui include ../src/manyiv_internals_m.mata
-* qui include ../src/manyiv.ado
+* qui include ../src/mata/manyiv_absorb.mata
+* qui include ../src/mata/manyiv_internals.mata
+* qui include ../src/ado/manyiv.ado
 
 capture program drop main
 program main

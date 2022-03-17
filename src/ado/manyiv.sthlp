@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.5.0 14Nov2021}{...}
+{* *! version 0.5.1 17Mar2022}{...}
 {viewerdialog manyiv "dialog manyiv"}{...}
 {vieweralsosee "[R] manyiv" "mansection R manyiv"}{...}
 {viewerjumpto "Syntax" "manyiv##syntax"}{...}
@@ -52,7 +52,7 @@ Run multiple IV regressions:
 {p_end}
 {synopt :{opt nostats}} Do not compute stats.
 {p_end}
-{synopt :{opt nosquarem}} No SQUAREM acceeration (multiple absorb only).
+{synopt :{opth method(str)}} Residualizing method: SQUAREM (default), CG, FPI.
 {p_end}
 
 {p2colreset}{...}

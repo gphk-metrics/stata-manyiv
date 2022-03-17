@@ -67,7 +67,7 @@ void function ManyIVreg_IM::fit(
     class ManyIVreg_Absorb scalar Absorb,
     class ManyIVreg_Absorb scalar AbsorbIV)
 {
-    real scalar i, G, qc, skipcons
+    real scalar i, j, G, qc, skipcons
     real scalar mmin, lamre, Qs, c, Lam11, Lam22, h, Vvalid, Vinvalid
     real matrix Xi
     real vector overid, pvalue, selw
@@ -319,12 +319,42 @@ void function ManyIVreg_IM::fit(
         // 5.4 Cluster, if requested
         // -------------------------
 
-        clustered = cluster.nabsorb
-        if ( clustered > 1 ) {
-            errprintf("multi-way clustering not implemented; will ignore\n")
+        // 2-way clustering not allowed; leave here since you already coded it.
+        clustered = cluster.nabsorb > 0
+        if ( cluster.nabsorb > 1 ) {
+            errprintf("n-way clustering not implemented; will ignore\n")
             clustered = 0
         }
-        else if ( clustered ) {
+        else if ( cluster.nabsorb == 2 ) {
+            cluster.combine()
+            sec = J(3, jive? 6: 4, 0)
+            qc  = -1, 1, 1
+            for(j = 0; j <= 2; j++) {
+                G = j? cluster.nlevels[j]: cluster.nlevels_combined
+                for(i = 1; i <= G; i++) {
+                    sel_i     = panelsubmatrix(cluster.index(j), i, cluster.info(j))
+                    hatP_i    = hatP[sel_i, .]
+                    epsilon_i = epsilon[sel_i, .]
+                    sec[j + 1, .] = sec[j + 1, .] + colsum(epsilon_i :* hatP_i):^2
+                }
+                // v1 small-sample adjustment
+                // if ( small ) {
+                //     qc[j + 1] = qc[j + 1] * (((n - 1) / (n - L - 1)) * (G / (G - 1)))
+                // }
+            }
+            // v2 small-sample adjustment
+            if ( small ) {
+                G  = min(cluster.nlevels)
+                qc = qc * (((n - 1) / (n - L - 1)) * (G / (G - 1)))
+            }
+            if ( jive ) {
+                se[3, 1::6] = sqrt(qc * sec) :/ abs(T' * hatP)
+            }
+            else {
+                se[3, 1::4] = sqrt(qc * sec) :/ abs(T' * hatP)
+            }
+        }
+        else if ( cluster.nabsorb == 1 ) {
             sec   = J(1, jive? 6: 4, 0)
             G     = cluster.nlevels[1]
             for(i = 1; i <= G; i++) {

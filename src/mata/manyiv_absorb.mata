@@ -29,7 +29,7 @@ class ManyIVreg_Absorb
     real scalar nabsorb
     real scalar hdfetol
     real scalar maxiter
-    real scalar squarem
+    real scalar hdfemethod
     real vector nlevels
     real vector total_nlevels
     real vector encoded
@@ -77,35 +77,36 @@ class ManyIVreg_Absorb
     void _hdfe()
     void _hdfe_fpi()
     void _hdfe_squarem()
+    void _hdfe_cg()
     real scalar _hdfe_halperin()
     real scalar _hdfe_halperin_symm()
     real scalar _demean()
 }
 
-class ManyIVreg_Absorb scalar function ManyIVreg_Absorb_New(string vector _absorbvars, string scalar _touse, | real scalar _squarem)
+class ManyIVreg_Absorb scalar function ManyIVreg_Absorb_New(string vector _absorbvars, string scalar _touse, | real scalar _hdfemethod)
 {
     class ManyIVreg_Absorb scalar Absorb
-    if ( args() < 3 ) _squarem = 0
+    if ( args() < 3 ) _hdfemethod = 3
     Absorb = ManyIVreg_Absorb()
-    Absorb.init(_absorbvars, _touse, _squarem)
+    Absorb.init(_absorbvars, _touse, _hdfemethod)
     return(Absorb)
 }
 
 void function ManyIVreg_Absorb::new()
 {
-    this.hdfetol   = 1e-8
-    this.maxiter   = 1000
-    this.encoded   = 0
-    this.squarem   = 0
-    this.ncombined = 0
-    this.nobs      = 0
+    this.hdfetol    = 1e-8
+    this.maxiter    = 1000
+    this.encoded    = 0
+    this.hdfemethod = 3
+    this.ncombined  = 0
+    this.nobs       = 0
     this.nlevels_combined = 0
     this.nsingledrop = 0
     this.nsingletons = 0
     this.d_computed  = 0
 }
 
-void function ManyIVreg_Absorb::init(string vector _absorbvars, string scalar _touse, | real scalar _squarem)
+void function ManyIVreg_Absorb::init(string vector _absorbvars, string scalar _touse, | real scalar _hdfemethod)
 {
     real scalar j
     absorbvars    = _absorbvars
@@ -120,7 +121,7 @@ void function ManyIVreg_Absorb::init(string vector _absorbvars, string scalar _t
         nlevels[j] = makepanel(absorbvars[j])
         total_nlevels = total_nlevels + nlevels[j]
     }
-    if ( args() >= 3 ) squarem = _squarem
+    if ( args() >= 3 ) hdfemethod = _hdfemethod
     // Note: The idea is for df to not be modified by append
     df = total_nlevels - nabsorb
 }
@@ -213,7 +214,7 @@ void function ManyIVreg_Absorb::combine()
         set_info(0, combinedinfo)
         set_index(0, combinedix)
         set_nj(0, combinednj)
-        set_id(0, combinedid)
+        set_groupid(0, combinedid)
         set_skip(0, combinedskip)
 
         nlevels_combined = rows(combinedinfo)
@@ -786,7 +787,10 @@ void function ManyIVreg_Absorb::_hdfe(real matrix X, | real scalar base)
     }
     else if ( nabsorb > 1 ) {
         // Note: base option doesn't work with multipe FE
-        if ( squarem ) {
+        if ( hdfemethod == 3 ) {
+            _hdfe_cg(X)
+        }
+        else if ( hdfemethod == 2 ) {
             _hdfe_squarem(X)
         }
         else {
@@ -796,7 +800,7 @@ void function ManyIVreg_Absorb::_hdfe(real matrix X, | real scalar base)
 }
 
 // Note: In the past you tried breaking the iteration if the tolerance was
-//       achieved by any given _pair_ if fixed effects. This doesn't work;
+//       achieved by any given _pair_ of fixed effects. This doesn't work;
 //       the easiest counter example is if fe2 is collinear with fe1 but fe3
 //       is not. Then the algorithm would incorrectly stop at fe2.
 
@@ -873,12 +877,66 @@ void function ManyIVreg_Absorb::_hdfe_squarem(real matrix X)
     }
 }
 
+void function ManyIVreg_Absorb::_hdfe_cg(real matrix X)
+{
+    real matrix R, U, V
+    real scalar i, feval, dev, stop
+    real rowvector alpha, rr, r0, beta, nproj
+
+    (void) _hdfe_halperin_symm(R = X)
+    stop  = 0
+    i     = 0
+    feval = 1
+    R     = - (X - R)
+    rr    = colsum(R:^2)
+    U     = R
+
+    while ( i++ < maxiter ) {
+        (void) _hdfe_halperin_symm(V = U)
+        V   = U - V
+        feval++
+
+        alpha = rr :/ colsum(U :* V)
+        dev   = max(abs(alpha :* U))
+        X     = X + alpha :* U
+        if ( dev < hdfetol ) break
+
+        if ( max(abs(rr :* alpha)) < (10 * epsilon(1)) ) {
+            stop = 1
+            dev  = _hdfe_halperin_symm(X)
+            feval++
+            break
+        }
+
+        r0   = rr
+        R    = R - alpha :* V
+        rr   = colsum(R:^2)
+        beta = rr :/ r0
+        U    = R + beta :* U
+    }
+
+    if ( i > maxiter ) {
+        errprintf("maximum number of hdfe iterations exceeded (%g)\n", maxiter)
+        error(1234)
+    }
+    else {
+        nproj = feval * (nabsorb + nabsorb - 1)
+        if ( stop ) {
+            printf("hdfe convergence (cg) assumed after %g projections (error = %5.3g)\n", nproj, dev)
+            printf("(epsilon was close to 0; stopped to avoid numerical precision errors)\n")
+        }
+        else {
+            printf("hdfe convergence (cg) after %g projections (error = %5.3g)\n", nproj, dev)
+        }
+    }
+}
+
 real scalar function ManyIVreg_Absorb::_hdfe_halperin(real matrix X)
 {
     real scalar j, dev
-    dev = 1
+    dev = 0
     for (j = 1; j <= nabsorb; j++) {
-        dev = _demean(X, j)
+        dev = max((dev, _demean(X, j)))
     }
     return(dev)
 }
@@ -886,12 +944,12 @@ real scalar function ManyIVreg_Absorb::_hdfe_halperin(real matrix X)
 real scalar function ManyIVreg_Absorb::_hdfe_halperin_symm(real matrix X)
 {
     real scalar j, dev
-    dev = 1
+    dev = 0
     for (j = 1; j <= nabsorb; j++) {
-        dev = _demean(X, j)
+        dev = max((dev, _demean(X, j)))
     }
-    for (j = nabsorb - 1; j > 1; j--) {
-        dev = _demean(X, j)
+    for (j = nabsorb - 1; j >= 1; j--) {
+        dev = max((dev, _demean(X, j)))
     }
     return(dev)
 }

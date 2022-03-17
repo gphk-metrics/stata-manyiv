@@ -1,4 +1,4 @@
-*! version 0.5.0 14Nov2021
+*! version 0.5.1 17Mar2022
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
@@ -72,13 +72,13 @@ program manyiv, eclass
                              ///
         internals(str)       ///
         SAVEresults(str)     /// name of mata object to store results
+        method(str)          /// SQUAREM (default), CG (conjugate gradient), FPI (fixed point iteration)
                              ///
         noConstant           /// omit constant
         nosmall              /// omit small-sample adjustments
         noPRINTtable         /// do not print table
         nose                 /// omit standard errors
         nostats              /// omit additional statistics
-        nosquarem            /// do not use SQUAREM accelerator (multiple absorb only)
                              ///
         _plugin_skip         ///
         _plugin_bench        ///
@@ -89,10 +89,24 @@ program manyiv, eclass
     local estimatestats = ("`estimatestats'" == "")
     local small         = ("`small'"         == "")
     local cons          = ("`constant'"      == "")
-    local squarem       = ("`squarem'"       == "")
 
+    if ( "`method'"   == "" ) local method squarem
     if ( "`absorb'"   != "" ) unab absorb:   `absorb'
     if ( "`absorbiv'" != "" ) unab absorbiv: `absorbiv'
+
+    if ( lower(`"`method'"') == "fpi" ) {
+        local method_code 1
+    }
+    else if ( lower(`"`method'"') == "squarem" ) {
+        local method_code 2
+    }
+    else if ( inlist(lower(`"`method'"'), "conjugate gradient", "conjugate_gradient", "cg") ) {
+        local method_code 3
+    }
+    else {
+        disp as err "method() must be one of: cg, squarem, fpi"
+        exit 198
+    }
 
     local problems: list absorb & absorbiv
     if ( `"`problems'"' != `""' ) {
@@ -153,8 +167,8 @@ program manyiv, eclass
     * ------------------
 
     * Note: Need this here to drop singletons
-    mata `A'  = ManyIVreg_Absorb_New(tokens(st_local("absorb")),   "`touse'", `squarem')
-    mata `IV' = ManyIVreg_Absorb_New(tokens(st_local("absorbiv")), "`touse'", `squarem')
+    mata `A'  = ManyIVreg_Absorb_New(tokens(st_local("absorb")),   "`touse'", `method_code')
+    mata `IV' = ManyIVreg_Absorb_New(tokens(st_local("absorbiv")), "`touse'", `method_code')
     mata `IV'.append(`A')
 
     scalar `nsingletons' = 0
@@ -232,7 +246,7 @@ program manyiv, eclass
     * 4. Variables to use in regressions
     * ----------------------------------
 
-    mata `C' = ManyIVreg_Absorb_New(tokens(st_local("cluster")), "`touse'", `squarem')
+    mata `C' = ManyIVreg_Absorb_New(tokens(st_local("cluster")), "`touse'", `method_code')
     mata `Y' = st_data(., "`ivdepvar'", "`touse'")
     mata `X' = st_data(., "`ivendog'",  "`touse'")
 
