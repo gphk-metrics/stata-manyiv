@@ -10,7 +10,7 @@ Various instrumental variables regressions (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE
 From the command line:
 
 ```
-git clone git@github.com:mcaceresb/stata-manyiv
+git clone git@github.com:gphk-metrics/stata-manyiv
 ```
 
 (or download the code manually and unzip). From Stata:
@@ -26,7 +26,7 @@ could be installed directly from Stata:
 
 ```
 local github "https://raw.githubusercontent.com"
-net install manyiv, from(`github'/mcaceresb/stata-manyiv/master/)
+net install manyiv, from(`github'/gphk-metrics/stata-manyiv/master/)
 ```
 
 ### Usage
@@ -66,7 +66,7 @@ manyiv y (x = .)     w, absorb(fe) absorbiv(iv) cluster(c)
 To compute the jive and ujive estimators with multiple absorb levels, `manyiv` uses a plugin compiled with the [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) library. Pre-compiled binaries are provided in [this reposirtory](src/build). To re-compile the plugin from source, install Eigen3 (using your system's package manager or from [their website](http://eigen.tuxfamily.org/index.php?title=Main_Page#Download)) and run:
 
 ```
-git clone git@github.com:mcaceresb/stata-manyiv
+git clone git@github.com:gphk-metrics/stata-manyiv
 cd stata-manyiv
 make all EIGEN=/path/to/eigen3
 ```
