@@ -18,7 +18,8 @@ end
 
 capture program drop load_data
 program load_data
-    global dropbox ~/Dropbox/Papers/GPH_ExaminerDesign/Applications/DGPY
+    * global dropbox ~/Dropbox/Papers/GPH_ExaminerDesign/Applications/DGPY
+    global dropbox ~/Dropbox/GPH_ExaminerDesign/Applications/DGPY
     use "${dropbox}/Data/paulData",clear
     gegen office_id = group(office)
     gegen judge_id  = group(judge)
