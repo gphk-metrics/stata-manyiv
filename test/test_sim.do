@@ -407,6 +407,9 @@ program misc_checks
     cap noi jive y (x = z1 z2 _iv*) w _fe*, r
     cap noi jive y (x = _iv*), r
 
+    manyiv y (x = z1 z2 _iv*) w _fe*, cluster(c) forcejive
+    jive `e(depvar)' (`e(instrumented)' = `e(instruments)') `e(exogenous)' if e(sample), r
+
     * manyiv y (x = z1 z2) w, cluster(c) absorbiv(iviv) absorb(fefe fe fe2)
     * jive y (x = z1 z2 _civiv*) _cfefe* _fe* _2fe* w
 end

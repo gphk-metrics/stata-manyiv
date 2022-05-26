@@ -1,7 +1,3 @@
-set seed 42
-set linesize 112
-tempfile info
-
 clear
 set obs 1000
 gen u   = rnormal()
@@ -51,6 +47,7 @@ mata A.encode()
 
 plugin call manyiv_plugin, `"_plugin_check"'
 
+tempfile info
 mata IV.exportc("`info'")
 mata dtest = IV.d_projection()
 plugin call manyiv_plugin, `"_plugin_run"' `"`info'"' ""

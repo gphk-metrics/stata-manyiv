@@ -3,7 +3,7 @@ ManyIV
 
 Various instrumental variables regressions (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 
-`version 0.5.2 28Mar2022` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples) | [Compiling](#compiling)
+`version 0.6.1 26May2022` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples) | [Compiling](#compiling)
 
 ### Installation
 
@@ -59,6 +59,31 @@ manyiv y (x = z1 z2) w, absorb(fe) cluster(c)
 manyiv y (x = z1 z2) w, absorbiv(iv) cluster(c)
 manyiv y (x = z1 z2) w, absorb(fe) absorbiv(iv) cluster(c)
 manyiv y (x = .)     w, absorb(fe) absorbiv(iv) cluster(c)
+```
+
+There are instances where jive/ujive will fail because they are
+leave-one-out estimators and a covariate or fixed effect group will be
+collinear with a given observation. If dealing with the issue manually
+is otherwise prohibitive, the `forcejive` option will prompt `manyiv` to
+drop observations and/or covariates until jive/ujive can run.
+
+```stata
+clear
+input z1 z2 fe iv
+-1 -1 0 0
+1  1 0 0
+3  3 1 0
+-3 -3 1 1
+0  0 2 1
+0  0 2 1
+1 2 3 2
+2 3 3 2
+end
+gen z3 = _n^2
+gen x  = z1 + z2 + z3 + rnormal()
+gen y  = x + rnormal()
+manyiv y (x = z1 z2), absorb(fe) absorbiv(iv)
+manyiv y (x = z1 z2), absorb(fe) absorbiv(iv) forcejive
 ```
 
 ### Compiling

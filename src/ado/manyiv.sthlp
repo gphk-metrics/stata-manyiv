@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.5.2 28Mar2022}{...}
+{* *! version 0.6.1 26May2022}{...}
 {viewerdialog manyiv "dialog manyiv"}{...}
 {vieweralsosee "[R] manyiv" "mansection R manyiv"}{...}
 {viewerjumpto "Syntax" "manyiv##syntax"}{...}
@@ -39,6 +39,8 @@ Run multiple IV regressions:
 {synopt :{opt skipsingletons}} Skip singleton absorb groups.
 {p_end}
 {synopt :{opt keepsingletons}} Keep singleton absorb groups (jive/ujive not estimated with this option).
+{p_end}
+{synopt :{opt forcejive}} Make sure jive/ujive  will run. (Supersedes other options.)
 {p_end}
 {synopt :{opth save:results(str)}} Save results into mata object.
 {p_end}
@@ -133,3 +135,27 @@ sequence of Kolesar, Chetty, Friedman, Glaeser and Imbens (2011)
 {phang2}{cmd:. manyiv y (x = z1 z2) w, absorbiv(iv) cluster(c)           }{p_end}
 {phang2}{cmd:. manyiv y (x = z1 z2) w, absorb(fe) absorbiv(iv) cluster(c)}{p_end}
 {phang2}{cmd:. manyiv y (x = .)     w, absorb(fe) absorbiv(iv) cluster(c)}{p_end}
+
+{pstd}There are instances where jive/ujive will fail because they are
+leave-one-out estimators and a covariate or fixed effect group will be
+collinear with a given observation. If dealing with the issue manually
+is otherwise prohibitive, the {opt forcejive} option will prompt
+{cmd:manyiv} to drop observations and/or covariates until jive/ujive can
+run.{p_end}
+
+{phang2}{cmd:. clear                                                  }{p_end}
+{phang2}{cmd:. input z1 z2 fe iv                                      }{p_end}
+{phang2}{cmd:  -1 -1 0 0                                              }{p_end}
+{phang2}{cmd:  1  1 0 0                                               }{p_end}
+{phang2}{cmd:  3  3 1 0                                               }{p_end}
+{phang2}{cmd:  -3 -3 1 1                                              }{p_end}
+{phang2}{cmd:  0  0 2 1                                               }{p_end}
+{phang2}{cmd:  0  0 2 1                                               }{p_end}
+{phang2}{cmd:  1 2 3 2                                                }{p_end}
+{phang2}{cmd:  2 3 3 2                                                }{p_end}
+{phang2}{cmd:  end                                                    }{p_end}
+{phang2}{cmd:. gen z3 = _n^2                                          }{p_end}
+{phang2}{cmd:. gen x  = z1 + z2 + z3 + rnormal()                      }{p_end}
+{phang2}{cmd:. gen y  = x + rnormal()                                 }{p_end}
+{phang2}{cmd:. manyiv y (x = z1 z2), absorb(fe) absorbiv(iv)          }{p_end}
+{phang2}{cmd:. manyiv y (x = z1 z2), absorb(fe) absorbiv(iv) forcejive}{p_end}

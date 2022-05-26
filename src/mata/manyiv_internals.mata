@@ -22,7 +22,7 @@ class ManyIVreg_IM
     real rowvector beta
     real matrix se, RFS
     struct ManyIVStats scalar stats
-    real scalar n, K, L, F
+    real scalar n, K, L, F, rc
 
     real scalar clustered
     real scalar estimatese
@@ -32,13 +32,28 @@ class ManyIVreg_IM
     real scalar nabsorbed_w
     real scalar nabsorbed_z
     real scalar jive
+    real scalar loaded
 
+    real colvector yp, Tp, yq, Tq
+    real matrix Wp, Wq, Zq
+
+    void loadvars()
+    void dropvars()
+    void checkjive()
     void results()
     void print()
     void fit()
+    void new()
 
     string colvector betaLabels
     string colvector seLabels
+}
+
+void function ManyIVreg_IM::new()
+{
+    rc = 0
+    loaded = 0
+    dropvars()
 }
 
 // y              = `Y'
@@ -67,27 +82,24 @@ void function ManyIVreg_IM::fit(
     class ManyIVreg_Absorb scalar Absorb,
     class ManyIVreg_Absorb scalar AbsorbIV)
 {
-    real scalar i, j, G, qc, skipcons
+    real scalar i, j, G, qc
     real scalar mmin, lamre, Qs, c, Lam11, Lam22, h, Vvalid, Vinvalid
     real matrix Xi
-    real vector overid, pvalue, selw
-    real colvector sel_i, yp, Tp, yq, Tq
-    real colvector wselix, zselix
-    real rowvector coll
+    real vector overid, pvalue
+    real colvector sel_i
 
-    real matrix YY, YPY, YMY, ZW, yTZW
+    real matrix YY, YPY, YMY, ZW
     real matrix epsilon, epsilon_i, hatP, hatP_i
-    real matrix Wp, Zq, Wq, MW_yT, MWD_yT, MWD_Z, HZ_yT, S, Sp
+    real matrix MW_yT, MWD_yT, MWD_Z, HZ_yT, S, Sp
     real matrix Omre, Omure, Gamma, Sig
     real vector k, ei, sec, DZW, DW, iIDZW, iIDW, a, b
     real vector hatTjive, hatTujive, hatPjive, hatPujive
 
+    if ( loaded == 0 ) loadvars(y, T, Z, W, _cons, Absorb, AbsorbIV)
+
     estimatese    = _estimatese
     estimatestats = _estimatestats
     small         = _small
-    cons          = _cons
-    nabsorbed_w   = 0
-    nabsorbed_z   = 0
     jive          = ((AbsorbIV.nabsorb <= 2) | AbsorbIV.d_computed) & ((Absorb.nabsorb <= 2) | Absorb.d_computed)
 
     if ( jive == 0 ) {
@@ -99,102 +111,25 @@ void function ManyIVreg_IM::fit(
         jive = 0
     }
 
-    n = rows(Z)
-    K = cols(Z)
-    L = cols(W)
     betaLabels = ("OLS", "TSLS", "LIML", "MBTSLS", "JIVE", "UJIVE", "RTSLS")'
     seLabels   = ("Homoskedastic", "Heteroscedastic", "Cluster", "ManyIV", "ManyIV")'
 
     // Note: This is not really necessary bc I check there is at least one
     // instrument and there can be at most one exogenous variable. Take out?
     if ( (K + AbsorbIV.df) < cols(T) ) {
-        errprintf("need at least as many instruments (found %g) as endogenous variables (%g)\n",
+        errprintf("\nneed at least as many instruments (found %g) as endogenous variables (%g)\n",
                   K + AbsorbIV.df, cols(T))
-        error(198)
+        rc = 481
+        return
     }
 
     // 2. Point estimates
-    // Note: These apply Frisch–Waugh–Lovell; project the covariate
-    // of interest and the instrument onto W's null space then use
-    // univariate formulas.
-
-    if ( Absorb.nabsorb ) {
-        Absorb.flagredundant()
-        nabsorbed_w = Absorb.df + !cons
-
-        yTZW   = Absorb.hdfe((y, T, Z, W))
-        zselix = cols(Z)? 3::(2 + cols(Z)): J(0, 1, 0)
-        wselix = cols(W)? (3 + cols(Z))::(2 + cols(Z) + cols(W)): J(0, 1, 0)
-        coll   = sf_helper_licols(yTZW[., wselix], Absorb.hdfetol / n)
-
-// TODO: xx does this actually merit error? Perfectly projecting into
-// covariates might be something to allow. Otherwise don't omit y, T.
-//
-//         if ( coll[1] == 0 ) {
-//             errprintf("dependent variable collinear with absorb groups\n")
-//             error(1234)
-//         }
-//
-//         if ( coll[2] == 0 ) {
-//             errprintf("endogenous variable of interest collinear with absorb groups\n")
-//             error(1234)
-//         }
-
-        yp   = yTZW[., 1]
-        Tp   = yTZW[., 2]
-        Wp   = cols(W)? select(yTZW[., wselix], coll): W
-        L    = cols(Wp) + nabsorbed_w
-    }
-    else {
-        yp   = y
-        Tp   = T
-        Wp   = W
-    }
-
-    if ( AbsorbIV.nabsorb ) {
-        AbsorbIV.flagredundant()
-        nabsorbed_z = AbsorbIV.df
-
-        skipcons = cons & !AbsorbIV.allhaveskip()
-        selw   = cols(W)? (J(1, cols(W)-1, 1), !skipcons): J(1, 0, 0)
-        yTZW   = AbsorbIV.hdfe((y, T, Z, select(W, selw)))
-        zselix = cols(Z)? 3::(3 + cols(Z) - 1): J(0, 1, 0)
-        wselix = any(selw)? (3 + cols(Z))::cols(yTZW): J(0, 1, 0)
-        coll   = sf_helper_licols(yTZW[., (zselix \ wselix)], AbsorbIV.hdfetol / n)
-
-// TODO: xx ibid.
-        yq   = yTZW[., 1]
-        Tq   = yTZW[., 2]
-        Zq   = cols(Z)?   select(yTZW[., zselix], coll[zselix :- 2]): Z
-        Wq   = any(selw)? select(yTZW[., wselix], coll[wselix :- 2]): select(W, selw)
-        K    = cols(Zq) + nabsorbed_z
-    }
-    else {
-        yq   = yp
-        Tq   = Tp
-
-        // Account for collinear columns | instrument in RF and FS (only
-        // needed of no absorb instruments)
-        if ( Absorb.nabsorb ) {
-            coll = sf_helper_licols(yTZW[., (zselix \ wselix)], Absorb.hdfetol / n)
-            Zq   = cols(Z)? select(yTZW[., zselix], coll[zselix :- 2]): Z
-            Wq   = cols(W)? select(yTZW[., wselix], coll[wselix :- 2]): Wp
-// TODO: xx ibid.
-        }
-        else {
-            Zq = Z
-            Wq = Wp
-        }
-        K = cols(Zq)
-    }
+    // ------------------
 
     if ( K < cols(T) ) {
-        errprintf("instruments collinear with absorb levels (only %g independent; need %g)\n", K, cols(T))
-        error(198)
-    }
-
-    if ( cols(Zq) < cols(Z) ) {
-        printf("(dropped %g collinear instruments)\n", cols(Z) - cols(Zq))
+        errprintf("\ninstruments collinear with absorb levels (only %g independent; need %g)\n", K, cols(T))
+        rc = 481
+        return
     }
 
     MW_yT  = sf_helper_annihilator(Wp, (yp, Tp))          // [y_⊥ T_⊥] = M_W [y T]
@@ -239,29 +174,43 @@ void function ManyIVreg_IM::fit(
             DZW = DZW :+ AbsorbIV.d_projection()
         }
 
-        iIDZW  = 1 :/ edittozero(1 :- DZW, n) // (I - D_{Z W})^{-1} as a vector
-        iIDW   = 1 :/ edittozero(1 :- DW, n)  // (I - D_W)^{-1} as a vector
+        iIDZW = 1 :/ edittozero(1 :- DZW, n) // (I - D_{Z W})^{-1} as a vector
+        iIDW  = 1 :/ edittozero(1 :- DW, n)  // (I - D_W)^{-1} as a vector
 
-        hatTujive = T :- iIDZW :* sf_helper_annihilator(ZW, Tq) //     (I - (I - D_{Z W})^{-1} M_{Z W}) T
-        hatPjive  = sf_helper_annihilator(Wp, hatTujive)        // M_W (I - (I - D_{Z W})^{-1} M_{Z W}) T
-        Absorb._hdfe(hatPjive)
+        if ( missing(iIDZW) | missing(iIDW) ) {
+            errprintf("\n")
+            errprintf("Unable to compute jive/ujive (leave-one-out matrix not full-rank).\n")
+            errprintf("You can use the option -forcejive- to drop problematic observations;\n")
+            errprintf("however, a better alternative would be to investigate why jive/ujive\n")
+            errprintf("fails. The issue is a covariate or fixed effect group that identifies a\n")
+            errprintf("single observation, causing the leave-one-out estimators to fail. Manually\n")
+            errprintf("dropping such covariate(s) or group(s) is preferable to -forcejive-.\n")
 
-        hatTjive  = T :- iIDW :* sf_helper_annihilator(Wp, Tp)  // (I - (I - D_W)^{-1} M_W) T
-        hatPujive = hatTujive - hatTjive // (I - D_W)^{-1} M_W T - (I - D_{Z W})^{-1} M_{Z W} T
-                                         // = (I - D_W)^{-1} (I - H_W) T - (I - D_{Z W})^{-1} (I - H_{Z W}) T
-                                         // = ((I - D_{Z W})^{-1} (H_{Z W} - I) - (I - D_W)^{-1} (H_W - I) T) T
-                                         // = (
-                                         //     (I - D_{Z W})^{-1} (H_{Z W} - D_{Z W} - (I - D_{Z W})) -
-                                         //     (I - D_W)^{-1} (H_W - D_W - (I - D_W))
-                                         // ) T
-                                         // = ((I - D_{Z W})^{-1} (H_{Z W} - D_{Z W}) - (I - D_W)^{-1} (H_W - D_W)) T
+            jive = 0
+            beta = beta, J(1, 2, .), YPY[1, 1] / YPY[1, 2]
+        }
+        else {
+            hatTujive = T :- iIDZW :* sf_helper_annihilator(ZW, Tq) //     (I - (I - D_{Z W})^{-1} M_{Z W}) T
+            hatPjive  = sf_helper_annihilator(Wp, hatTujive)        // M_W (I - (I - D_{Z W})^{-1} M_{Z W}) T
+            Absorb._hdfe(hatPjive)
 
-        beta =  (
-            beta,
-            (hatPjive'  * y) / (hatPjive'  * T),
-            (hatPujive' * y) / (hatPujive' * T),
-            YPY[1, 1] / YPY[1, 2]
-        )
+            hatTjive  = T :- iIDW :* sf_helper_annihilator(Wp, Tp)  // (I - (I - D_W)^{-1} M_W) T
+            hatPujive = hatTujive - hatTjive // (I - D_W)^{-1} M_W T - (I - D_{Z W})^{-1} M_{Z W} T
+                                             // = (I - D_W)^{-1} (I - H_W) T - (I - D_{Z W})^{-1} (I - H_{Z W}) T
+                                             // = ((I - D_{Z W})^{-1} (H_{Z W} - I) - (I - D_W)^{-1} (H_W - I) T) T
+                                             // = (
+                                             //     (I - D_{Z W})^{-1} (H_{Z W} - D_{Z W} - (I - D_{Z W})) -
+                                             //     (I - D_W)^{-1} (H_W - D_W - (I - D_W))
+                                             // ) T
+                                             // = ((I - D_{Z W})^{-1} (H_{Z W} - D_{Z W}) - (I - D_W)^{-1} (H_W - D_W)) T
+
+            beta =  (
+                beta,
+                (hatPjive'  * y) / (hatPjive'  * T),
+                (hatPujive' * y) / (hatPujive' * T),
+                YPY[1, 1] / YPY[1, 2]
+            )
+        }
     }
     else {
         beta =  beta, J(1, 2, .), YPY[1, 1] / YPY[1, 2]
@@ -442,6 +391,152 @@ void function ManyIVreg_IM::fit(
         stats.Sargan = overid[1], pvalue[1]
         stats.CD     = overid[2], pvalue[2]
     }
+}
+
+void function ManyIVreg_IM::loadvars(
+    real colvector y,
+    real colvector T,
+    real matrix Z,
+    real matrix W,
+    real scalar _cons,
+    class ManyIVreg_Absorb scalar Absorb,
+    class ManyIVreg_Absorb scalar AbsorbIV)
+{
+    real scalar skipcons
+    real vector selw
+    real colvector wselix, zselix
+    real rowvector coll
+    real matrix yTZW
+
+    nabsorbed_z = 0
+    nabsorbed_w = 0
+    cons = _cons
+    n = length(y)
+    K = cols(Z)
+    L = cols(W)
+
+    if ( Absorb.nabsorb ) {
+        Absorb.flagredundant()
+        nabsorbed_w = Absorb.df + !cons
+
+        yTZW   = Absorb.hdfe((y, T, Z, W))
+        zselix = cols(Z)? 3::(2 + cols(Z)): J(0, 1, 0)
+        wselix = cols(W)? (3 + cols(Z))::(2 + cols(Z) + cols(W)): J(0, 1, 0)
+        coll   = sf_helper_licols(yTZW[., wselix], Absorb.hdfetol / n)
+
+// TODO: xx does this actually merit error? Perfectly projecting into
+// covariates might be something to allow. Otherwise don't omit y, T.
+//
+//         if ( coll[1] == 0 ) {
+//             errprintf("dependent variable collinear with absorb groups\n")
+//             error(1234)
+//         }
+//
+//         if ( coll[2] == 0 ) {
+//             errprintf("endogenous variable of interest collinear with absorb groups\n")
+//             error(1234)
+//         }
+
+        yp   = yTZW[., 1]
+        Tp   = yTZW[., 2]
+        Wp   = cols(W)? select(yTZW[., wselix], coll): W
+        L    = cols(Wp) + nabsorbed_w
+    }
+    else {
+        yp   = y
+        Tp   = T
+        Wp   = W
+    }
+
+    if ( AbsorbIV.nabsorb ) {
+        AbsorbIV.flagredundant()
+        nabsorbed_z = AbsorbIV.df
+
+        skipcons = cons & !AbsorbIV.allhaveskip()
+        selw   = cols(W)? (J(1, cols(W)-1, 1), !skipcons): J(1, 0, 0)
+        yTZW   = AbsorbIV.hdfe((y, T, Z, select(W, selw)))
+        zselix = cols(Z)? 3::(3 + cols(Z) - 1): J(0, 1, 0)
+        wselix = any(selw)? (3 + cols(Z))::cols(yTZW): J(0, 1, 0)
+        coll   = sf_helper_licols(yTZW[., (zselix \ wselix)], AbsorbIV.hdfetol / n)
+
+// TODO: xx ibid.
+        yq   = yTZW[., 1]
+        Tq   = yTZW[., 2]
+        Zq   = cols(Z)?   select(yTZW[., zselix], coll[zselix :- 2]): Z
+        Wq   = any(selw)? select(yTZW[., wselix], coll[wselix :- 2]): select(W, selw)
+        K    = cols(Zq) + nabsorbed_z
+    }
+    else {
+        yq   = yp
+        Tq   = Tp
+
+        // Account for collinear columns | instrument in RF and FS (only
+        // needed of no absorb instruments)
+        if ( Absorb.nabsorb ) {
+            coll = sf_helper_licols(yTZW[., (zselix \ wselix)], Absorb.hdfetol / n)
+            Zq   = cols(Z)? select(yTZW[., zselix], coll[zselix :- 2]): Z
+            Wq   = cols(W)? select(yTZW[., wselix], coll[wselix :- 2]): Wp
+// TODO: xx ibid.
+        }
+        else {
+            Zq = Z
+            Wq = Wp
+        }
+        K = cols(Zq)
+    }
+
+    if ( cols(Zq) < cols(Z) ) {
+        printf("(dropped %g collinear instruments)\n", cols(Z) - cols(Zq))
+    }
+
+    loaded = 1
+}
+
+void function ManyIVreg_IM::checkjive(
+    string scalar touse,
+    class ManyIVreg_Absorb scalar Absorb,
+    class ManyIVreg_Absorb scalar AbsorbIV)
+{
+    real matrix ZW
+    real vector DW, DZW, iIDZW, iIDW
+
+    ZW  = (Wq, Zq)
+    DW  = rowsum((Wp * invsym(Wp' * Wp)) :* Wp)
+    DZW = rowsum((ZW * invsym(ZW' * ZW)) :* ZW)
+
+    if ( (Absorb.nabsorb > 0) & (AbsorbIV.nabsorb > 0) ) {
+        DW  = DW  :+ Absorb.d_projection()
+        DZW = DZW :+ AbsorbIV.d_projection()
+    }
+    else if ( Absorb.nabsorb > 0 ) {
+        DW  = DW  :+ Absorb.d_projection()
+        DZW = DZW :+ Absorb.d_projection()
+    }
+    else if ( AbsorbIV.nabsorb > 0 ) {
+        DZW = DZW :+ AbsorbIV.d_projection()
+    }
+
+    iIDZW = 1 :/ edittozero(1 :- DZW, n)
+    iIDW  = 1 :/ edittozero(1 :- DW, n)
+
+    if ( missing(iIDZW) | missing(iIDW) ) {
+        st_local("checkjive", "1")
+        st_store(., touse, touse, (iIDZW :< .) :& (iIDW :< .))
+    }
+    else {
+        st_local("checkjive", "0")
+    }
+}
+
+void function ManyIVreg_IM::dropvars()
+{
+    yp = .
+    Tp = .
+    Wp = .
+    yq = .
+    Tq = .
+    Zq = .
+    Wq = .
 }
 
 void function ManyIVreg_IM::results(string scalar bname, string scalar sename)
