@@ -56,11 +56,3 @@ mata A = ManyIVreg_Absorb_New(tokens("fe"), "")
 mata Z = A.hdfe(st_data(., "z", ""))
 mata D = 1 :- (rowsum((Z * invsym(Z' * Z)) :* Z) + A.d_projection())
 mata D
-
-set obs 6
-replace z = 1 in 5
-replace z = 2 in 6
-replace fe = _n > 2
-replace x = z + rnormal() in 5/6
-replace y = x + rnormal() in 5/6
-manyiv y (x = z), absorb(fe) forcejive
