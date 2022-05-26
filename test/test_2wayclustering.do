@@ -20,10 +20,10 @@ gen x   = 1 + 0.1 * z1 - 0.2 * z2 - 1/(1 + iv * iv2) + u
 gen y   = 1 + x + w + 1/(1 + fe) - 1/(1 + fe2) + e
 gen byte touse = _n > 2
 
-mata mata clear
-qui include ../src/mata/manyiv_absorb.mata
-qui include ../src/mata/manyiv_internals.mata
-qui include ../src/ado/manyiv.ado
+* mata mata clear
+* qui include ../src/mata/manyiv_absorb.mata
+* qui include ../src/mata/manyiv_internals.mata
+* qui include ../src/ado/manyiv.ado
 manyiv y (x = z1 z2), cluster(c c2) nosmall
 ivreghdfe y (x = z1 z2), cluster(c c2)
 manyiv y (x = z1 z2), cluster(c c2)

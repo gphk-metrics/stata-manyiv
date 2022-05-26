@@ -19,8 +19,8 @@ gen x   = 1 + 0.1 * z1 - 0.2 * z2 - 1/(1 + iv * iv2) + u
 gen y   = 1 + x + w + 1/(1 + fe) - 1/(1 + fe2) + e
 gen byte touse = _n > 2
 
-mata mata clear
-qui do ../src/mata/manyiv_absorb.mata
+* mata mata clear
+* qui do ../src/mata/manyiv_absorb.mata
 mata A  = ManyIVreg_Absorb_New(tokens("fe iv"), "touse", 1)
 mata A.dropsingletons(.)
 mata A.encode()

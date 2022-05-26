@@ -1,4 +1,4 @@
-*! version 0.5.2 28Mar2022
+*! version 0.6.0 25May2022
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
@@ -8,8 +8,6 @@
 *       "unable to compute d_projection using plugin; temporary
 *       file corrupted". Internal element can be called d_token or
 *       similar. String scalar.
-
-* TODO: xx mata errors should exit te entire program, not just mata
 
 * TODO: xx after the above, add unit tests, including error checking
 *       and expected error exits and CLT sims for SEs.
@@ -68,6 +66,7 @@ program manyiv, eclass
         absorbiv(str)        /// Absorb instruments
         skipsingletons       /// skip singleton groups
         keepsingletons       /// do not drop singleton groups
+        forcejive            /// make sure jive/ujive will run
         cluster(varname)     /// clustered SE
                              ///
         internals(str)       ///
@@ -83,6 +82,15 @@ program manyiv, eclass
         _plugin_skip         ///
         _plugin_bench        ///
     ]
+
+    if ( "`forcejive'" != "" ) {
+        foreach opt in skipsingletons keepsingletons {
+            if ( "``opt''" != "" ) {
+                disp as txt "Option -`opt'- ignored with -forcejive-"
+                local `opt'
+            }
+        }
+    }
 
     local benchmark     = ("`_plugin_bench'" != "")
     local estimatese    = ("`estimatese'"    == "")
@@ -125,8 +133,158 @@ program manyiv, eclass
     }
 
     ***********************************************************************
-    *                           Parse IV Syntax                           *
+    *                           Parse varlists                            *
     ***********************************************************************
+
+    * 0. Parse IV Syntax
+    * ------------------
+
+    ParseIVSyntax `anything', absorbiv(`absorbiv')
+
+    * 1. Touse from varlist
+    * ---------------------
+
+    tempname Y X Z W C A IV singlecons
+    local varlist `ivdepvar' `ivendog' `ivinst' `ivexog'
+    marksample touse
+
+    * 2. Drop singletons
+    * ------------------
+
+    DropSingletons `touse' `A' `IV' `method_code', ///
+        `keepsingletons' `skipsingletons' absorb(`absorb') absorbiv(`absorbiv')
+    scalar `singlecons' = r(singlecons)
+
+    manyiv_timer info `t99' `"Steps 1 & 2. Parse variables; drop singletons"', prints(`benchmark')
+
+    * 3. Collinear fixed effects and diagonal of projection matrix
+    * ------------------------------------------------------------
+
+    DiagonalProjection `A' `IV', `_plugin_skip' `_plugin_bench'
+
+    manyiv_timer info `t99' `"Step 3. Compute diagonal projection for FEs"', prints(`benchmark')
+
+    * 4. Variables to use in regressions
+    * ----------------------------------
+
+    ReadVarlist `touse' `C' `Y' `X' `W' `Z' `method_code' `singlecons' `constant', ///
+        ivcall(`anything') cluster(`cluster') absorb(`absorb') absorbiv(`absorbiv')
+    local cons = `r(cons)'
+
+    manyiv_timer info `t99' `"Step 4. Variables to use in regression"', prints(`benchmark')
+
+    ***********************************************************************
+    *                             Estimation                              *
+    ***********************************************************************
+
+    local ManyIVreg:  copy local saveresults
+    local ManyIVData: copy local savedata
+
+    tempname results beta se rc
+    if "`ManyIVData'" == "" tempname ManyIVData
+    if "`ManyIVreg'"  == "" tempname ManyIVreg
+
+    mata `ManyIVreg' = ManyIVreg_IM()
+    mata `ManyIVreg'.loadvars(`Y', `X', `Z', `W', `cons', `A', `IV')
+
+    * Very inefficient recursive loop; only run if requested
+    if ( "`forcejive'" != "" ) {
+        local checkjive 0
+        mata `ManyIVreg'.checkjive("`touse'", `A', `IV')
+        qui count if `touse'
+        if ( `r(N)' == 0 ) error 2000
+        if ( `checkjive' ) {
+            disp
+            disp as err "{bf:warning:} option -forcejive- will drop observations and/or covariates"
+            disp as err "until jive/ujive can be computed. However, it is preferable for the user"
+            disp as err "to investigate why jive/ujive fails and manually drop the responsible"
+            disp as err "variables or observations. The root issue is likely a covariate or fixed"
+            disp as err "effect group that identifies a single observation."
+        }
+        qui while ( `checkjive' ) {
+            DropSingletons `touse' `A' `IV' `method_code', ///
+                `keepsingletons' `skipsingletons' absorb(`absorb') absorbiv(`absorbiv')
+            qui count if `touse'
+            if ( `r(N)' == 0 ) error 2000
+            scalar singlecons = r(singlecons)
+            DiagonalProjection `A' `IV', `_plugin_skip' `_plugin_bench'
+            ReadVarlist `touse' `C' `Y' `X' `W' `Z' `method_code' `singlecons' `constant', ///
+                ivcall(`anything') cluster(`cluster') absorb(`absorb') absorbiv(`absorbiv')
+            local cons = `r(cons)'
+            mata `ManyIVreg'.loadvars(`Y', `X', `Z', `W', `cons', `A', `IV')
+            mata `ManyIVreg'.checkjive("`touse'", `A', `IV')
+        }
+        manyiv_timer info `t99' `"Step X. Force JIVE/UJIVE"', prints(`benchmark')
+    }
+
+    * Finally, fit the model
+    mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `small', `cons', `C', `A', `IV')
+    mata `ManyIVreg'.dropvars()
+
+    mata st_numscalar("`rc'", `ManyIVreg'.rc)
+    if ( `=scalar(`rc')' ) exit `=scalar(`rc')'
+    mata `ManyIVreg'.results("`beta'", "`se'")
+
+    manyiv_timer info `t99' `"Step 5. ManyIV fit"', prints(`benchmark') off
+
+    if ( "`printtable'" != "noprinttable" ) {
+        mata `ManyIVreg'.print()
+    }
+
+    tempname F Omega Xi Sargan CD rf fs jive kinst
+    ereturn post `beta', esample(`touse')
+    if ( `estimatese' ) {
+        ereturn matrix se    = `se'
+        ereturn scalar small = `small'
+    }
+    mata st_numscalar("`jive'", `ManyIVreg'.jive)
+    ereturn scalar jive = `jive'
+
+    ereturn local depvar:       copy local ivdepvar
+    ereturn local instrumented: copy local ivendog
+    ereturn local instruments:  copy local ivinst
+    ereturn local exogenous:    copy local ivexog
+
+    if ( `:list sizeof ivinst' ) {
+        mata st_numscalar("`kinst'", rows(`ManyIVreg'.RFS))
+        if ( `=scalar(`kinst')' ) {
+            mata st_matrix("`rf'", `ManyIVreg'.RFS[.,1])
+            mata st_matrix("`fs'", `ManyIVreg'.RFS[.,2])
+            ereturn matrix rf = `rf'
+            ereturn matrix fs = `fs'
+        }
+        else {
+            disp as txt "{bf:warning:} unable to recover reduced form or first stage"
+            if ( `:list sizeof absorb' + `:list sizeof absorbiv' ) {
+                disp as txt "(instruments likely collinear with absorb levels)"
+            }
+        }
+    }
+
+    mata st_numscalar("`F'", `ManyIVreg'.stats.F)
+    ereturn scalar F = `F'
+    if ( `estimatestats' ) {
+        mata st_matrix("`Omega'",  `ManyIVreg'.stats.Omega)
+        mata st_matrix("`Xi'",     `ManyIVreg'.stats.Xi)
+        mata st_matrix("`Sargan'", `ManyIVreg'.stats.Sargan)
+        mata st_matrix("`CD'",     `ManyIVreg'.stats.CD)
+
+        ereturn matrix Omega  = `Omega'
+        ereturn matrix Xi     = `Xi'
+        ereturn matrix Sargan = `Sargan'
+        ereturn matrix CD     = `CD'
+    }
+end
+
+***********************************************************************
+*                                                                     *
+*                          Modularized Steps                          *
+*                                                                     *
+***********************************************************************
+
+capture program drop ParseIVSyntax
+program ParseIVSyntax
+    syntax anything(equalok), [absorbiv(str)]
 
     if !regexm(`"`anything' "', ".+\((.+=.+)\)[^\.]") {
         disp as err "Unable to parse IV syntax: depvar (endogenous = instrument) [exogenous]"
@@ -152,19 +310,22 @@ program manyiv, eclass
     }
     else helper_syntax_error `ivinst', msg(instrument variables)
 
-    ***********************************************************************
-    *                           Parse varlists                            *
-    ***********************************************************************
+    c_local ivdepvar: copy local ivdepvar
+    c_local ivendog:  copy local ivendog
+    c_local ivinst:   copy local ivinst
+    c_local ivexog:   copy local ivexog
+end
 
-    * 1. Touse from varlist
-    * ---------------------
+capture program drop DropSingletons
+program DropSingletons, rclass
+    syntax anything, [skipsingletons keepsingletons absorb(str) absorbiv(str)]
+    tokenize `anything'
+    local touse:       copy local 1
+    local A:           copy local 2
+    local IV:          copy local 3
+    local method_code: copy local 4
 
-    tempname Y X Z W C A IV nsingletons addnsingletons onesingleton singleix singlecons nabsorb tag
-    local varlist `ivdepvar' `ivendog' `ivinst' `ivexog'
-    marksample touse
-
-    * 2. Drop singletons
-    * ------------------
+    tempname singlecons nsingletons addnsingletons singleix onesingleton tag
 
     * Note: Need this here to drop singletons
     mata `A'  = ManyIVreg_Absorb_New(tokens(st_local("absorb")),   "`touse'", `method_code')
@@ -218,12 +379,19 @@ program manyiv, eclass
         disp as txt "{bf:note: will drop `strnsingletons' singleton group`s'}"
     }
 
-    manyiv_timer info `t99' `"Steps 1 & 2. Parse variables; drop singletons"', prints(`benchmark')
+    return scalar singlecons = `singlecons'
+end
 
-    * 3. Collinar fixed effects and diagonal of projection matrix
-    * -----------------------------------------------------------
+capture program drop DiagonalProjection
+program DiagonalProjection
+    syntax anything, [_plugin_skip _plugin_bench]
+
+    tokenize `anything'
+    local A:  copy local 1
+    local IV: copy local 2
 
     tempfile info
+    tempname nabsorb
     mata st_numscalar("`nabsorb'", `IV'.nabsorb)
     if ( (`=scalar(`nabsorb')' > 1) & ("`_plugin_skip'" == "") ) {
         mata `IV'.exportc("`info'")
@@ -240,11 +408,26 @@ program manyiv, eclass
         mata `A'.importc("`info'")
     }
     cap erase `"`info'"'
+end
 
-    manyiv_timer info `t99' `"Step 3. Compute diagonal projection for FEs"', prints(`benchmark')
+capture program drop ReadVarlist
+program ReadVarlist, rclass
+    syntax anything, [ivcall(str) cluster(str) absorb(str) absorbiv(str)]
 
-    * 4. Variables to use in regressions
-    * ----------------------------------
+    tokenize `anything'
+    local touse:       copy local 1
+    local C:           copy local 2
+    local Y:           copy local 3
+    local X:           copy local 4
+    local W:           copy local 5
+    local Z:           copy local 6
+    local method_code: copy local 7
+    local singlecons:  copy local 8
+    local constant:    copy local 9
+
+    ParseIVSyntax `ivcall', absorbiv(`absorbiv')
+
+    local cons = ("`constant'" == "")
 
     mata `C' = ManyIVreg_Absorb_New(tokens(st_local("cluster")), "`touse'", `method_code')
     mata `Y' = st_data(., "`ivdepvar'", "`touse'")
@@ -287,8 +470,6 @@ program manyiv, eclass
         disp as error "Only one endogenous variabe allowed"
         exit 198
     }
-
-    manyiv_timer info `t99' `"Step 4. Variables to use in regression"', prints(`benchmark')
 
     * TODO: Decide whether to make hard errors or leave as warnings
     * -------------------------------------------------------------
@@ -344,66 +525,19 @@ program manyiv, eclass
         disp as error "{bf:warning:} included as both absorb and non-absorb: `problems'"
     }
 
-    ***********************************************************************
-    *                             Estimation                              *
-    ***********************************************************************
+    return local cons: copy local cons
 
-    local ManyIVreg:  copy local saveresults
-    local ManyIVData: copy local savedata
-
-    tempname results beta se
-    if "`ManyIVData'" == "" tempname ManyIVData
-    if "`ManyIVreg'"  == "" tempname ManyIVreg
-
-    mata `ManyIVreg' = ManyIVreg_IM()
-    mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `small', `cons', `C', `A', `IV')
-    mata `ManyIVreg'.results("`beta'", "`se'")
-
-    manyiv_timer info `t99' `"Step 5. ManyIV fit"', prints(`benchmark') off
-
-    if ( "`printtable'" != "noprinttable" ) {
-        mata `ManyIVreg'.print()
-    }
-
-    tempname F Omega Xi Sargan CD rf fs jive kinst
-    ereturn post `beta', esample(`touse')
-    if ( `estimatese' ) {
-        ereturn matrix se    = `se'
-        ereturn scalar small = `small'
-    }
-    mata st_numscalar("`jive'", `ManyIVreg'.jive)
-    ereturn scalar jive = `jive'
-
-    if ( `:list sizeof ivinst' ) {
-        mata st_numscalar("`kinst'", rows(`ManyIVreg'.RFS))
-        if ( `=scalar(`kinst')' ) {
-            mata st_matrix("`rf'", `ManyIVreg'.RFS[.,1])
-            mata st_matrix("`fs'", `ManyIVreg'.RFS[.,2])
-            ereturn matrix rf = `rf'
-            ereturn matrix fs = `fs'
-        }
-        else {
-            disp as txt "{bf:warning:} unable to recover reduced form or first stage"
-            if ( `:list sizeof absorb' + `:list sizeof absorbiv' ) {
-                disp as txt "(instruments likely collinear with absorb levels)"
-            }
-        }
-    }
-
-    mata st_numscalar("`F'", `ManyIVreg'.stats.F)
-    ereturn scalar F = `F'
-    if ( `estimatestats' ) {
-        mata st_matrix("`Omega'",  `ManyIVreg'.stats.Omega)
-        mata st_matrix("`Xi'",     `ManyIVreg'.stats.Xi)
-        mata st_matrix("`Sargan'", `ManyIVreg'.stats.Sargan)
-        mata st_matrix("`CD'",     `ManyIVreg'.stats.CD)
-
-        ereturn matrix Omega  = `Omega'
-        ereturn matrix Xi     = `Xi'
-        ereturn matrix Sargan = `Sargan'
-        ereturn matrix CD     = `CD'
-    }
+    c_local ivdepvar: copy local ivdepvar
+    c_local ivendog:  copy local ivendog
+    c_local ivinst:   copy local ivinst
+    c_local ivexog:   copy local ivexog
 end
+
+***********************************************************************
+*                                                                     *
+*                               Helpers                               *
+*                                                                     *
+***********************************************************************
 
 capture program drop helper_syntax_error
 program helper_syntax_error
@@ -433,14 +567,15 @@ program helper_strip_omitted, rclass
     _rmcoll `anything' `extra' `if', expand `options'
     local expanded `r(varlist)'
 
-    tempname b omit
+    tempname b omit final
     matrix `b' = J(1, `:list sizeof expanded', .)
     matrix colnames `b' = `expanded'
     matrix `b' = `b'[1,1..(`:list sizeof expanded' - `:list sizeof extra')]
 
     _ms_omit_info `b'
     matrix `omit' = r(omit)
-    mata st_local("varlist", invtokens(select(st_matrixcolstripe("`b'")[., 2]', !st_matrix("r(omit)"))))
+    mata `final' = select(st_matrixcolstripe("`b'")[., 2]', !st_matrix("r(omit)"))
+    mata st_local("varlist", invtokens(cols(`final')? `final': ""))
 
     return local expanded: copy local expanded
     return local varlist:  copy local varlist

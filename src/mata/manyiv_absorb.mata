@@ -445,12 +445,12 @@ void function ManyIVreg_Absorb::dropfromindex(real colvector dropindex, | real s
         singleoffset = runningsum(singleoffset)
 
         info[., 2] = info[., 2] :- singleoffset
-        nj = (0 \ info[|(1, 2) \ (nl - 1, 2)|])
+        nj = (0 \ ((nl > 1)? info[|(1, 2) \ (nl - 1, 2)|]: J(0, 1, .)))
         info[., 1] = nj :+ 1
         nj = info[., 2] :- nj
         if ( j != reference ) {
             sel = selectindex(nj :== 0)
-            if ( rows(sel) ) {
+            if ( length(sel) ) {
                 singleoffset = J(rows(info), 1, 0)
                 singleoffset[sel] = J(rows(sel), 1, 1)
                 singleoffset = runningsum(singleoffset)
@@ -608,7 +608,7 @@ real colvector function ManyIVreg_Absorb::d_projection(| real scalar base)
         return(0)
     }
     else if ( nabsorb == 1 ) {
-        D = (1 :/ nj(1))[groupid(1)]
+        D = (1 :/ nj(1))[groupid(1), .]
         if ( base ) {
             D[groupindex(1, base)] = J(nj(1)[base], 1, 0)
         }

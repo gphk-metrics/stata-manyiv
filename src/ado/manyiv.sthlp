@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.5.2 28Mar2022}{...}
+{* *! version 0.6.0 25May2022}{...}
 {viewerdialog manyiv "dialog manyiv"}{...}
 {vieweralsosee "[R] manyiv" "mansection R manyiv"}{...}
 {viewerjumpto "Syntax" "manyiv##syntax"}{...}
@@ -39,6 +39,8 @@ Run multiple IV regressions:
 {synopt :{opt skipsingletons}} Skip singleton absorb groups.
 {p_end}
 {synopt :{opt keepsingletons}} Keep singleton absorb groups (jive/ujive not estimated with this option).
+{p_end}
+{synopt :{opt forcejive}} Make sure jive/ujive  will run. (Supersedes other options.)
 {p_end}
 {synopt :{opth save:results(str)}} Save results into mata object.
 {p_end}
