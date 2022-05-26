@@ -63,3 +63,4 @@ replace z = 2 in 6
 replace fe = _n > 2
 replace x = z + rnormal() in 5/6
 replace y = x + rnormal() in 5/6
+manyiv y (x = z), absorb(fe) forcejive

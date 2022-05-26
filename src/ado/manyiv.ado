@@ -198,8 +198,8 @@ program manyiv, eclass
             disp as err "{bf:warning:} option -forcejive- will drop observations and/or covariates"
             disp as err "until jive/ujive can be computed. However, it is preferable for the user"
             disp as err "to investigate why jive/ujive fails and manually drop the responsible"
-            disp as err "variables or observations. The root issue is likely a covariate or fixed"
-            disp as err "effect group that identifies a single observation."
+            disp as err "variables or observations. The root issue is a covariate or fixed effect"
+            disp as err "group that identifies a single observation."
         }
         qui while ( `checkjive' ) {
             DropSingletons `touse' `A' `IV' `method_code', ///
