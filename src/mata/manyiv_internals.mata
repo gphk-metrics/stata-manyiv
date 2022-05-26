@@ -182,7 +182,7 @@ void function ManyIVreg_IM::fit(
             errprintf("Unable to compute jive/ujive (leave-one-out matrix not full-rank).\n")
             errprintf("You can use the option -forcejive- to drop problematic observations;\n")
             errprintf("however, a better alternative would be to investigate why jive/ujive\n")
-            errprintf("fails. The issue is a covariate of fixed effect group that identifies a\n")
+            errprintf("fails. The issue is a covariate or fixed effect group that identifies a\n")
             errprintf("single observation, causing the leave-one-out estimators to fail. Manually\n")
             errprintf("dropping such covariate(s) or group(s) is preferable to -forcejive-.\n")
 
