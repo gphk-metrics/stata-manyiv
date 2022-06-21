@@ -633,6 +633,7 @@ program plugin_error_dispatcher
     if `rc' == 1701 disp as err "plugin error: fixed effects matrix inversion failed"
     if `rc' == 1702 disp as err "plugin error: unable to allocate plugin obbject (out of memory)"
     if `rc' == 1703 disp as err "plugin error: unable to export results back to Stata from plugin"
+    if `rc' disp as err "(performance warning: plugin failed to run; will fall back on pure Stata code)"
     exit `rc'
 end
 
