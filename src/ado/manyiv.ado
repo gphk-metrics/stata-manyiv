@@ -1,4 +1,4 @@
-*! version 0.6.1 26May2022
+*! version 0.6.2 27Jul2022
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>

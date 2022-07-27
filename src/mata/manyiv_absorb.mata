@@ -242,7 +242,7 @@ void function ManyIVreg_Absorb::flagredundant(| real scalar skipredundant)
     }
     else if ( nabsorb > 2 ) {
         errprintf("SE incorrect; use the C++ plugin to compute the dof adjustment with more than 2 levels\n")
-        error(1234)
+        _error(1234)
     }
     else {
         encode()
@@ -359,8 +359,8 @@ void function ManyIVreg_Absorb::dropsingletons(|real colvector singleix, real sc
         dropfromindex(singleix)
 
         if ( nobs :== 0 ) {
-            errprintf("all singleton groups")
-            error(1234)
+            errprintf("all singleton groups\n")
+            _error(1234)
         }
     }
     else if ( method == 2 ) {
@@ -557,7 +557,7 @@ void function ManyIVreg_Absorb::append(class ManyIVreg_Absorb scalar Absorb)
 
     if ( nobs != Absorb.nobs ) {
         errprintf("cannot append different number of observations (%g vs %g)\n", nobs, Absorb.nobs)
-        error(1234)
+        _error(1234)
     }
 
     exists = J(Absorb.nabsorb, 1, 0)
@@ -694,7 +694,7 @@ real colvector function ManyIVreg_Absorb::d_projection(| real scalar base)
     }
     else {
         errprintf("use the C++ plugin to compute the projection with more than 2 levels\n")
-        error(1234)
+        _error(1234)
     }
 }
 
@@ -815,7 +815,7 @@ void function ManyIVreg_Absorb::_hdfe_fpi(real matrix X)
     }
     if ( i > maxiter ) {
         errprintf("maximum number of hdfe iterations exceeded (%g)\n", maxiter)
-        error(1234)
+        _error(1234)
     }
     else {
         printf("hdfe convergence (fpi) after %g projections (error = %5.3g)\n", i * nabsorb, dev)
@@ -870,7 +870,7 @@ void function ManyIVreg_Absorb::_hdfe_squarem(real matrix X)
 
     if ( i > maxiter ) {
         errprintf("maximum number of hdfe iterations exceeded (%g)\n", maxiter)
-        error(1234)
+        _error(1234)
     }
     else {
         printf("hdfe convergence (squarem) after %g projections (error = %5.3g)\n", feval * nabsorb, dev)
@@ -917,7 +917,7 @@ void function ManyIVreg_Absorb::_hdfe_cg(real matrix X)
 
     if ( i > maxiter ) {
         errprintf("maximum number of hdfe iterations exceeded (%g)\n", maxiter)
-        error(1234)
+        _error(1234)
     }
     else {
         nproj = feval * (nabsorb + nabsorb - 1)

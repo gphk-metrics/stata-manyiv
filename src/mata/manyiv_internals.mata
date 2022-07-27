@@ -429,12 +429,12 @@ void function ManyIVreg_IM::loadvars(
 //
 //         if ( coll[1] == 0 ) {
 //             errprintf("dependent variable collinear with absorb groups\n")
-//             error(1234)
+//             _error(1234)
 //         }
 //
 //         if ( coll[2] == 0 ) {
 //             errprintf("endogenous variable of interest collinear with absorb groups\n")
-//             error(1234)
+//             _error(1234)
 //         }
 
         yp   = yTZW[., 1]

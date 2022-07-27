@@ -4,4 +4,5 @@ do test_sim.do
 do test_replicate.do
 do test_hdfe.do
 do test_ujivefail.do, nostop
+do test_corners.do, nostop
 * do test_2wayclustering.do
