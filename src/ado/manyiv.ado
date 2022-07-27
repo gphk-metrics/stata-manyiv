@@ -55,6 +55,8 @@ program manyiv, eclass
     *                           Actual Program                            *
     ***********************************************************************
 
+    if _N == 0 error 2000
+
     FreeTimer
     local t99: copy local FreeTimer
     manyiv_timer on `t99'

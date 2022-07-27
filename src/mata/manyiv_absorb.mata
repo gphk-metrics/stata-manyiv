@@ -147,6 +147,11 @@ real scalar function ManyIVreg_Absorb::makepanel(string scalar var)
     nl   = rows(varinfo)
     nobs = length(varindex)
 
+    if ( nobs == 0 ) {
+        errprintf("no observations\n")
+        _error(2000)
+    }
+
     asarray(absorbinfo, var + ".index", varindex)
     asarray(absorbinfo, var + ".info",  varinfo)
     asarray(absorbinfo, var + ".nj",    varinfo[., 2] :- varinfo[., 1] :+ 1)
@@ -358,9 +363,9 @@ void function ManyIVreg_Absorb::dropsingletons(|real colvector singleix, real sc
         singleix = uniqrows(singleix)
         dropfromindex(singleix)
 
-        if ( nobs :== 0 ) {
-            errprintf("all singleton groups\n")
-            _error(1234)
+        if ( nobs == 0 ) {
+            errprintf("all singleton groups; no observations\n")
+            _error(2000)
         }
     }
     else if ( method == 2 ) {
@@ -435,10 +440,11 @@ void function ManyIVreg_Absorb::dropfromindex(real colvector dropindex, | real s
 
         index = index :- singleoffset[index]
         index[selix] = J(rows(dropindex), 1, 0)
-        index = select(index, index)
+        index = index[selectindex(index), .]
+        // use selectindex to ensure colvector
 
         groupid[dropindex] = J(rows(dropindex), 1, 0)
-        groupid = select(groupid, groupid)
+        groupid = groupid[selectindex(groupid), .]
 
         singleoffset = J(rows(info), 1, 0)
         singleoffset[sel] = select(counts, counts)
@@ -456,11 +462,12 @@ void function ManyIVreg_Absorb::dropfromindex(real colvector dropindex, | real s
                 singleoffset = runningsum(singleoffset)
             }
         }
-        info = select(info, nj)
-        skip = select(skip, nj)
-        nj   = select(nj, nj)
+        sel  = selectindex(nj :!= 0)
+        info = info[sel, .]
+        skip = skip[sel, .]
+        nj   = nj[sel, .]
 
-        if ( rows(info) < nl ) {
+        if ( (rows(info) < nl) & rows(info) ) {
             groupid = groupid :- singleoffset[groupid]
         }
 
