@@ -23,6 +23,8 @@ assert _rc == 2000
 
 clear
 sysuse auto
+manyiv price (mpg =foreign), absorb(rep78)
+manyiv price (mpg =foreign turn), absorb(rep78)
 manyiv price (mpg = foreign), absorb(rep78)
 cap noi manyiv price (mpg = foreign) if _n == 0, absorb(rep78)
 assert _rc == 2000

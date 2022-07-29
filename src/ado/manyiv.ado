@@ -1,4 +1,4 @@
-*! version 0.6.2 27Jul2022
+*! version 0.6.3 29Jul2022
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
@@ -298,7 +298,7 @@ program ParseIVSyntax
 
     gettoken ivdepvar ivexog: ivexog
     gettoken ivendog ivinst: iveq, p(=)
-    gettoken _ ivinst: ivinst
+    gettoken _ ivinst: ivinst, p(=)
     local ivinst `ivinst'
 
     helper_syntax_error `ivdepvar', msg(dependent variable) plain
