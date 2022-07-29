@@ -1,2 +1,2 @@
-v 0.6.3
+v 0.6.4
 p 'MANYIV': Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)

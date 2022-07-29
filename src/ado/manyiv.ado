@@ -1,4 +1,4 @@
-*! version 0.6.3 29Jul2022
+*! version 0.6.4 29Jul2022
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
@@ -95,8 +95,8 @@ program manyiv, eclass
     }
 
     local benchmark     = ("`_plugin_bench'" != "")
-    local estimatese    = ("`estimatese'"    == "")
-    local estimatestats = ("`estimatestats'" == "")
+    local estimatese    = ("`se'"            == "")
+    local estimatestats = ("`stats'"         == "")
     local small         = ("`small'"         == "")
     local cons          = ("`constant'"      == "")
 
