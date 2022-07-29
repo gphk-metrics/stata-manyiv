@@ -22,7 +22,7 @@ args = vars(parser.parse_args())
 # ---------------------------------------------------------------------
 # Config
 
-config_version = "0.6.4"
+config_version = "0.6.5"
 config_date = date(2022, 7, 29)
 config_files = [
     ('version.py', 'config_version = "{major}.{minor}.{patch}"'),

@@ -1,4 +1,5 @@
 version 14.1
+set more off
 do test_sim.do
 do test_absorb.do
 do test_hdfe.do

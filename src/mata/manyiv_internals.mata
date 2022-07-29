@@ -82,7 +82,7 @@ void function ManyIVreg_IM::fit(
     class ManyIVreg_Absorb scalar Absorb,
     class ManyIVreg_Absorb scalar AbsorbIV)
 {
-    real scalar i, j, G, qc
+    real scalar i, j, G, qc, _ujiveonly
     real scalar mmin, lamre, Qs, c, Lam11, Lam22, h, Vvalid, Vinvalid
     real matrix Xi
     real vector overid, pvalue
@@ -97,8 +97,9 @@ void function ManyIVreg_IM::fit(
 
     if ( loaded == 0 ) loadvars(y, T, Z, W, _cons, Absorb, AbsorbIV)
 
-    estimatese    = _estimatese
-    estimatestats = _estimatestats
+    _ujiveonly    = st_local("_ujiveonly") != ""
+    estimatese    = !_ujiveonly & _estimatese
+    estimatestats = !_ujiveonly & _estimatestats
     small         = _small
     jive          = ((AbsorbIV.nabsorb <= 2) | AbsorbIV.d_computed) & ((Absorb.nabsorb <= 2) | Absorb.d_computed)
 
@@ -132,29 +133,36 @@ void function ManyIVreg_IM::fit(
         return
     }
 
-    MW_yT  = sf_helper_annihilator(Wp, (yp, Tp))          // [y_⊥ T_⊥] = M_W [y T]
-    MWD_yT = sf_helper_annihilator(Wq, (yq, Tq))          // [y_⊥ T_⊥] = M_W M_D [y T]
-    MWD_Z  = sf_helper_annihilator(Wq, Zq)                // Z_⊥ = M_W M_D Z
-    YY     = (MW_yT' * MW_yT)                             // [y_⊥ T_⊥]' [y_⊥ T_⊥] = [y T]' M_W [y T]
-    RFS    = sf_helper_solve(MWD_Z, MWD_yT)               // [solve(Z_⊥, y_⊥) solve(Z_⊥, T_⊥)] = Reduced form and First stage
-    HZ_yT  = (cols(Zq)? MWD_Z * RFS: 0) :+ MW_yT - MWD_yT // H_{Z_⊥} [y_⊥ T_⊥]
-    YPY    = MW_yT' * HZ_yT                               // [y_⊥ T_⊥]' H_{Z_⊥} [y_⊥ T_⊥]
-    YMY    = YY - YPY                                     // [y_⊥ T_⊥]' M_{Z_⊥} [y_⊥ T_⊥]
+    if ( !_ujiveonly ) {
+        MW_yT  = sf_helper_annihilator(Wp, (yp, Tp))          // [y_⊥ T_⊥] = M_W [y T]
+        MWD_yT = sf_helper_annihilator(Wq, (yq, Tq))          // [y_⊥ T_⊥] = M_W M_D [y T]
+        MWD_Z  = sf_helper_annihilator(Wq, Zq)                // Z_⊥ = M_W M_D Z
+        YY     = (MW_yT' * MW_yT)                             // [y_⊥ T_⊥]' [y_⊥ T_⊥] = [y T]' M_W [y T]
+        RFS    = sf_helper_solve(MWD_Z, MWD_yT)               // [solve(Z_⊥, y_⊥) solve(Z_⊥, T_⊥)] = Reduced form and First stage
+        HZ_yT  = (cols(Zq)? MWD_Z * RFS: 0) :+ MW_yT - MWD_yT // H_{Z_⊥} [y_⊥ T_⊥]
+        YPY    = MW_yT' * HZ_yT                               // [y_⊥ T_⊥]' H_{Z_⊥} [y_⊥ T_⊥]
+        YMY    = YY - YPY                                     // [y_⊥ T_⊥]' M_{Z_⊥} [y_⊥ T_⊥]
 
-    // 2.1 k-class: OLS, TSLS, LIML, MBTLS
-    // Note: These are all coded as
-    //
-    //     (T_⊥' (I - k W_{Z_⊥}) y_⊥) / (T_⊥' (I - k W_{Z_⊥}) T_⊥)
-    //
-    // So different values of k give different estimands.
-    //
-    // - k = 0 -> YY[1, 2]  / YY[2, 2]  = (y_⊥' T_⊥) / (T_⊥' T_⊥)
-    // - k = 1 -> YPY[1, 2] / YPY[2, 2] = (y_⊥' H_{Z_⊥} T_⊥) / (T_⊥' H_{Z_⊥} T_⊥)
-    // - The other two give liml and mbtsls
+        // 2.1 k-class: OLS, TSLS, LIML, MBTLS
+        // Note: These are all coded as
+        //
+        //     (T_⊥' (I - k W_{Z_⊥}) y_⊥) / (T_⊥' (I - k W_{Z_⊥}) T_⊥)
+        //
+        // So different values of k give different estimands.
+        //
+        // - k = 0 -> YY[1, 2]  / YY[2, 2]  = (y_⊥' T_⊥) / (T_⊥' T_⊥)
+        // - k = 1 -> YPY[1, 2] / YPY[2, 2] = (y_⊥' H_{Z_⊥} T_⊥) / (T_⊥' H_{Z_⊥} T_⊥)
+        // - The other two give liml and mbtsls
 
-    eigensystem(invsym(YMY) * YY, ., ei=.)
-    k    = (0, 1, min(Re(ei)), (1 - L/n) / (1 - (K - 1) / n - L/n))
-    beta = (YY[1, 2] :- k :* YMY[1, 2]) :/ (YY[2, 2] :- k :* YMY[2, 2])
+        eigensystem(invsym(YMY) * YY, ., ei=.)
+        k    = (0, 1, min(Re(ei)), (1 - L/n) / (1 - (K - 1) / n - L/n))
+        beta = (YY[1, 2] :- k :* YMY[1, 2]) :/ (YY[2, 2] :- k :* YMY[2, 2])
+    }
+    else {
+        beta = J(1, 4, .)
+        YMY  = J(2, 2, .)
+        YPY  = J(2, 2, .)
+    }
 
     // 2.2 JIVE, UJIVE
     if ( jive ) {
@@ -187,12 +195,18 @@ void function ManyIVreg_IM::fit(
             errprintf("dropping such covariate(s) or group(s) is preferable to -forcejive-.\n")
 
             jive = 0
-            beta = beta, J(1, 2, .), YPY[1, 1] / YPY[1, 2]
+            beta = beta, J(1, 2, .), (_ujiveonly? .: YPY[1, 1] / YPY[1, 2])
         }
         else {
-            hatTujive = T :- iIDZW :* sf_helper_annihilator(ZW, Tq) //     (I - (I - D_{Z W})^{-1} M_{Z W}) T
-            hatPjive  = sf_helper_annihilator(Wp, hatTujive)        // M_W (I - (I - D_{Z W})^{-1} M_{Z W}) T
-            Absorb._hdfe(hatPjive)
+            if ( _ujiveonly ) {
+                hatTujive = T :- iIDZW :* sf_helper_annihilator(ZW, Tq)
+                hatPjive  = .
+            }
+            else {
+                hatTujive = T :- iIDZW :* sf_helper_annihilator(ZW, Tq) //     (I - (I - D_{Z W})^{-1} M_{Z W}) T
+                hatPjive  = sf_helper_annihilator(Wp, hatTujive)        // M_W (I - (I - D_{Z W})^{-1} M_{Z W}) T
+                Absorb._hdfe(hatPjive)
+            }
 
             hatTjive  = T :- iIDW :* sf_helper_annihilator(Wp, Tp)  // (I - (I - D_W)^{-1} M_W) T
             hatPujive = hatTujive - hatTjive // (I - D_W)^{-1} M_W T - (I - D_{Z W})^{-1} M_{Z W} T
@@ -204,16 +218,27 @@ void function ManyIVreg_IM::fit(
                                              // ) T
                                              // = ((I - D_{Z W})^{-1} (H_{Z W} - D_{Z W}) - (I - D_W)^{-1} (H_W - D_W)) T
 
-            beta =  (
-                beta,
-                (hatPjive'  * y) / (hatPjive'  * T),
-                (hatPujive' * y) / (hatPujive' * T),
-                YPY[1, 1] / YPY[1, 2]
-            )
+            
+            if ( _ujiveonly ) {
+                beta =  (
+                    beta,
+                    .,
+                    (hatPujive' * y) / (hatPujive' * T),
+                    .
+                )
+            }
+            else {
+                beta =  (
+                    beta,
+                    (hatPjive'  * y) / (hatPjive'  * T),
+                    (hatPujive' * y) / (hatPujive' * T),
+                    YPY[1, 1] / YPY[1, 2]
+                )
+            }
         }
     }
     else {
-        beta =  beta, J(1, 2, .), YPY[1, 1] / YPY[1, 2]
+        beta =  beta, J(1, 2, .), (_ujiveonly? .: YPY[1, 1] / YPY[1, 2])
     }
 
     // ------------------
@@ -390,6 +415,9 @@ void function ManyIVreg_IM::fit(
         stats.Xi     = Xi
         stats.Sargan = overid[1], pvalue[1]
         stats.CD     = overid[2], pvalue[2]
+    }
+    else {
+        stats.F = F
     }
 }
 
