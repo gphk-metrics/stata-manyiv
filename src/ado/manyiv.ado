@@ -1,4 +1,4 @@
-*! version 0.6.5 29Jul2022
+*! version 0.6.6 10Aug2022
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
@@ -150,6 +150,8 @@ program manyiv, eclass
     tempname Y X Z W C A IV singlecons
     local varlist `ivdepvar' `ivendog' `ivinst' `ivexog'
     marksample touse
+    if ( `"`absorb'`absorbiv'"' != "" ) markout `touse' `absorb' `absorbiv', strok
+
 
     * 2. Drop singletons
     * ------------------

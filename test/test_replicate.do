@@ -36,7 +36,6 @@ program replicate
     ** Table 3, Column 2 and 3 of Row 1 (Panel A)
     ** Online Appendix Table 7, Column 5
     ** (TSLS matches the commented out results below)
-    do ../src/mata/manyiv_internals.mata
     manyiv `var'           (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id)
     manyiv `var' $controls (discharge = z_ij_pooled) if sample == 1,  absorb(absorbid2) cluster(office_id)
     manyiv `var' $controls (discharge = .)           if sample == 1,  absorb(absorbid2) cluster(office_id) absorbiv(judge)
