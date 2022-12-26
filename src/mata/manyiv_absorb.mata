@@ -81,6 +81,7 @@ class ManyIVreg_Absorb
     real scalar _hdfe_halperin()
     real scalar _hdfe_halperin_symm()
     real scalar _demean()
+    real rowvector _rowdivide()
 }
 
 class ManyIVreg_Absorb scalar function ManyIVreg_Absorb_New(string vector _absorbvars, string scalar _touse, | real scalar _hdfemethod)
@@ -888,38 +889,43 @@ void function ManyIVreg_Absorb::_hdfe_cg(real matrix X)
 {
     real matrix R, U, V
     real scalar i, feval, dev, stop
-    real rowvector alpha, rr, r0, beta, nproj
+    real rowvector alpha, xx, rr, r1, r0, diff, idiff, beta, nproj
 
+    idiff = 1 + hdfetol
+    xx    = quadcolsum(X:^2) 
     (void) _hdfe_halperin_symm(R = X)
     stop  = 0
     i     = 0
     feval = 1
-    R     = - (X - R)
-    rr    = colsum(R:^2)
+    R     = R - X
+    rr    = quadcolsum(R:^2)
     U     = R
 
-    while ( i++ < maxiter ) {
+    while ( (i++ < maxiter) & (idiff > hdfetol) ) {
         (void) _hdfe_halperin_symm(V = U)
         V   = U - V
         feval++
 
-        alpha = rr :/ colsum(U :* V)
-        dev   = max(abs(alpha :* U))
+        alpha = _rowdivide(rr, quadcolsum(U :* V))
+        r1    = alpha :* rr
+        r0    = rr
         X     = X + alpha :* U
-        if ( dev < hdfetol ) break
+        R     = R - alpha :* V
+        rr    = quadcolsum(R:^2)
+        beta  = _rowdivide(rr, r0)
+        U     = R + beta :* U
 
-        if ( max(abs(rr :* alpha)) < (10 * epsilon(1)) ) {
-            stop = 1
-            dev  = _hdfe_halperin_symm(X)
+        xx    = xx :- r1
+        idiff = sqrt(max(_rowdivide(r1, xx)))
+        diff  = max(r1)
+        if ( diff < epsilon(1) ) {
+            stop  = 1
+            dev   = _hdfe_halperin_symm(X)
+            idiff = 0
             feval++
             break
         }
 
-        r0   = rr
-        R    = R - alpha :* V
-        rr   = colsum(R:^2)
-        beta = rr :/ r0
-        U    = R + beta :* U
     }
 
     if ( i > maxiter ) {
@@ -979,6 +985,11 @@ real scalar function ManyIVreg_Absorb::_demean(real matrix X, real scalar j, | r
         // dev = dev + sum(avg:^2)
     }
     return(dev)
+}
+
+real rowvector function ManyIVreg_Absorb::_rowdivide(real rowvector a, real rowvector b)
+{
+    return(sign(b) :* a :/ colmax(abs(b) \ J(1, cols(b), epsilon(1))))
 }
 
 void function ManyIVreg_Absorb::exportc(string scalar fname)

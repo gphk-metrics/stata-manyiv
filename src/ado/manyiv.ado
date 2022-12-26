@@ -1,4 +1,4 @@
-*! version 0.6.6 10Aug2022
+*! version 0.6.7 25Dec2022
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
@@ -71,6 +71,7 @@ program manyiv, eclass
         forcejive            /// make sure jive/ujive will run
         cluster(varname)     /// clustered SE
                              ///
+        hatp(str)            /// hatp(hatPujive [hatPjive], [replace])
         internals(str)       ///
         SAVEresults(str)     /// name of mata object to store results
         method(str)          /// SQUAREM (default), CG (conjugate gradient), FPI (fixed point iteration)
@@ -101,7 +102,7 @@ program manyiv, eclass
     local small         = ("`small'"             == "")
     local cons          = ("`constant'"          == "")
 
-    if ( "`method'"   == "" ) local method squarem
+    if ( "`method'"   == "" ) local method cg
     if ( "`absorb'"   != "" ) unab absorb:   `absorb'
     if ( "`absorbiv'" != "" ) unab absorbiv: `absorbiv'
 
@@ -135,6 +136,13 @@ program manyiv, eclass
         }
     }
 
+    helper_parse_hatp `hatp'
+    if (`"`hatPjive'"' != "") & ("`_ujiveonly'" != "") {
+        disp as err "You have asked me to save \hat{P} for jive via -hatp()- but you have"
+        disp as err "also asked me not to compute jive via the undocumented _ujiveonly. I"
+        disp as err "will ignore your first request and skip jive."
+    }
+
     ***********************************************************************
     *                           Parse varlists                            *
     ***********************************************************************
@@ -151,7 +159,6 @@ program manyiv, eclass
     local varlist `ivdepvar' `ivendog' `ivinst' `ivexog'
     marksample touse
     if ( `"`absorb'`absorbiv'"' != "" ) markout `touse' `absorb' `absorbiv', strok
-
 
     * 2. Drop singletons
     * ------------------
@@ -224,6 +231,7 @@ program manyiv, eclass
 
     * Finally, fit the model
     mata `ManyIVreg'.fit(`Y', `X', `Z', `W', `estimatese', `estimatestats', `small', `cons', `C', `A', `IV')
+    helper_save_hatp `ManyIVreg' `hatPujive' `hatPjive', touse(`touse') `hatPreplace' `_ujiveonly'
     mata `ManyIVreg'.dropvars()
 
     mata st_numscalar("`rc'", `ManyIVreg'.rc)
@@ -585,6 +593,63 @@ program helper_strip_omitted, rclass
     return local expanded: copy local expanded
     return local varlist:  copy local varlist
     return matrix omit =  `omit'
+end
+
+capture program drop helper_parse_hatp
+program helper_parse_hatp
+    syntax [anything], [replace _ujiveonly]
+    if ( `:list sizeof anything' > 2 ) {
+        disp as err "can only generate \hat{P} for jive/ujive"
+        exit 198
+    }
+
+    gettoken hatPujive hatPjive: anything
+    local hatPujive `hatPujive'
+    local hatPjive  `hatPjive'
+
+    if `"`hatPujive'"' != "" confirm name `hatPujive'
+    if `"`hatPjive'"'  != "" confirm name `hatPjive'
+
+    if "`replace'" == "" {
+        if `"`hatPujive'"' != "" confirm new var `hatPujive'
+        if `"`hatPjive'"'  != "" confirm new var `hatPjive'
+    }
+
+    if `"`hatPjive'"' != "" disp as txt "will only generate \hat{P} for ujive"
+    c_local hatPujive:   copy local hatPujive
+    c_local hatPjive:    copy local hatPjive
+    c_local hatPreplace: copy local replace
+end
+
+capture program drop helper_save_hatp
+program helper_save_hatp
+    syntax anything, [touse(str) replace _ujiveonly]
+    gettoken ManyIVreg anything: anything
+    gettoken hatPujive hatPjive: anything
+    if "`_ujiveonly'" != "" local hatPjive
+
+    local hatPujive `hatPujive'
+    local hatPjive  `hatPjive'
+    mata st_local("jive", strofreal(`ManyIVreg'.jive))
+    if ( `jive' == 0 & "`hatPujive'`hatPjive'" != "" ) {
+        disp as err "Requested saving \hat{P} but ujive/jive was not computed; will ignore"
+        exit 0
+    }
+
+    foreach hatp_var in hatPujive hatPjive {
+        if "``hatp_var''" == "" continue
+        cap confirm new var ``hatp_var''
+        local rc = _rc
+        if ( `rc' & ("`replace'" == "") ) {
+            disp as err "Target exists without replace; this should have been checked"
+            disp as err "earlier in the function so please report this error as a bug."
+            exit 198
+        }
+        if ( `rc' ) qui replace ``hatp_var'' = .
+        else qui gen ``hatp_var'' = .
+        mata `ManyIVreg'.`hatp_var'[1::10,.]
+        mata st_store(., "``hatp_var''", "`touse'", `ManyIVreg'.`hatp_var')
+    }
 end
 
 capture program drop FreeTimer

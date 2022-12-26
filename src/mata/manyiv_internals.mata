@@ -35,6 +35,7 @@ class ManyIVreg_IM
     real scalar loaded
 
     real colvector yp, Tp, yq, Tq
+    real colvector hatPjive, hatPujive
     real matrix Wp, Wq, Zq
 
     void loadvars()
@@ -93,7 +94,7 @@ void function ManyIVreg_IM::fit(
     real matrix MW_yT, MWD_yT, MWD_Z, HZ_yT, S, Sp
     real matrix Omre, Omure, Gamma, Sig
     real vector k, ei, sec, DZW, DW, iIDZW, iIDW, a, b
-    real vector hatTjive, hatTujive, hatPjive, hatPujive
+    real vector hatTjive, hatTujive
 
     if ( loaded == 0 ) loadvars(y, T, Z, W, _cons, Absorb, AbsorbIV)
 
@@ -565,6 +566,8 @@ void function ManyIVreg_IM::dropvars()
     Tq = .
     Zq = .
     Wq = .
+    hatPjive  = .
+    hatPujive = .
 }
 
 void function ManyIVreg_IM::results(string scalar bname, string scalar sename)

@@ -41,11 +41,14 @@ program consistency
     egen iviv = group(iv fe)
     egen fefe = group(iv2 fe2)
 
-    manyiv y (x = z1 z2), cluster(c)
     manyiv y (x = z1 z2), cluster(c) noc
+    manyiv y (x = z1 z2), cluster(c) hatp(hatp_ujive hatp_jive)
+    ivreg y (x = hatp_ujive), cluster(c)
+    ivreg y (x = hatp_jive),  cluster(c)
     mata errors = J(0, 4, .)
     mata errow  = 0
 
+disp "checks 1"
     manyiv y (x = z1 z2) i.fe, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -59,6 +62,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(b2  :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 2"
     manyiv y (x = z1 z2) i.fe i.fe2, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -72,6 +76,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(b2  :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 3"
     manyiv y (x = z1 z2 i.iv i.iv2), cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -85,6 +90,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(b2  :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 4"
     manyiv y (x = z1 z2 i.iv i.iv2) i.fe i.fe2, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -98,6 +104,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 5"
     manyiv y (x = i.iv), cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -111,6 +118,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(b2  :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 6"
     manyiv y (x = z1 z2) w i.fe,  cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -124,6 +132,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(b2  :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 7"
     manyiv y (x = z1 z2 i.iv) w, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -137,6 +146,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(b2  :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 8"
     manyiv y (x = z1 z2 i.iv) w i.fe, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -154,6 +164,7 @@ program consistency
     mata se4 = st_matrix("e(se)")
     mata F4  = st_numscalar("e(F)")
 
+disp "checks 9"
     mata max(abs(b2  :- b1))
     mata max(abs(se2 :- se1))
     mata max(abs(F2  :- F1))
@@ -167,6 +178,7 @@ program consistency
     mata errors = errors \ (++errow, max(abs(b3  :- b1)), max(abs(se3 :- se1)), max(abs(F3  :- F1)))
     mata errors = errors \ (++errow, max(abs(b4  :- b1)), max(abs(se4 :- se1)), max(abs(F4  :- F1)))
 
+disp "checks 10"
     manyiv y (x = i.iv i.iv2) i.fe i.fe2, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -180,6 +192,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 11"
     manyiv y (x = i.iv i.iv2) i.fe i.fe2, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -193,6 +206,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 12"
     manyiv y (x = i.iv i.iv2) i.fe i.fe2, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -206,6 +220,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 13"
     manyiv y (x = i.iv i.iv2) w, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -219,6 +234,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 14"
     manyiv y (x = z1 z2 i.iv i.iv2) w, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -232,6 +248,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 15"
     manyiv y (x = z1 z2 i.iv i.iv2) w i.fe i.fe2, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -245,6 +262,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks 16"
     manyiv y (x = z1 z2 i.iv i.iv2 i.iv#i.fe) w, cluster(c)
     mata b1  = st_matrix("e(b)")
     mata se1 = st_matrix("e(se)")
@@ -289,6 +307,7 @@ program consistency
     * mata max(abs(F2  :- F1))
     * mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- b1)), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks special 0"
     * Singletons
     replace fe = 99 in 10/11
     replace iv = 98 in 10
@@ -309,6 +328,7 @@ program consistency
     levelsof feid if nfeid == 1, loc(ofeid)
     levelsof ivid if nivid == 1, loc(oivid)
 
+disp "checks special 1"
     ivregress 2sls y (x = z1 z2 io(`oivid').ivid) w io(`ofeid').feid, cluster(c) small
     manyiv y (x = z1 z2 io(`oivid').ivid) w io(`ofeid').feid, cluster(c)
     mata b1  = st_matrix("e(b)")
@@ -325,6 +345,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- editvalue(b1, 0, .))), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks special 2"
     manyiv y (x = z1 z2) w, absorbiv(iv) absorb(fe) cluster(c)
     manyiv y (x = z1 z2) w, absorbiv(iv) absorb(fe) cluster(c) _plugin_skip
     manyiv y (x = z1 z2) w, absorbiv(iv) absorb(fe) cluster(c) skipsingletons
@@ -338,6 +359,7 @@ program consistency
     manyiv y (x = z1 z2) w if (fe != 8) | (_n == 1), absorbiv(iv) absorb(fe) cluster(c) keepsingletons
     manyiv y (x = z1 z2) w if (fe != 8) | (_n == 1), absorbiv(iv) absorb(fe) cluster(c) keepsingletons _plugin_skip
 
+disp "checks special 3"
     * Redundant
     replace iv = 10.5 if fe == 7
     cap drop feid
@@ -351,6 +373,7 @@ program consistency
     levelsof feid if nfeid == 1, loc(ofeid)
     levelsof ivid if nivid == 1, loc(oivid)
 
+disp "checks special 4"
     ivregress 2sls y (x = z1 z2 io(`oivid').ivid) w io(`ofeid').feid, cluster(c) small
     manyiv y (x = z1 z2 io(`oivid').ivid) w io(`ofeid').feid, cluster(c)
     mata b1  = st_matrix("e(b)")
@@ -367,6 +390,7 @@ program consistency
     mata max(abs(F2  :- F1))
     mata errors = errors \ (++errow, max(abs(editvalue(b2, 0, .) :- editvalue(b1, 0, .))), max(abs(se2 :- se1)), max(abs(F2  :- F1)))
 
+disp "checks special 5"
     misc_checks
     mata errors
 end

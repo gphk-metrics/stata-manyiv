@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.6.6 10Aug2022}{...}
+{* *! version 0.6.7 25Dec2022}{...}
 {viewerdialog manyiv "dialog manyiv"}{...}
 {vieweralsosee "[R] manyiv" "mansection R manyiv"}{...}
 {viewerjumpto "Syntax" "manyiv##syntax"}{...}
@@ -41,6 +41,8 @@ Run multiple IV regressions:
 {synopt :{opt keepsingletons}} Keep singleton absorb groups (jive/ujive not estimated with this option).
 {p_end}
 {synopt :{opt forcejive}} Make sure jive/ujive  will run. (Supersedes other options.)
+{p_end}
+{synopt :{opt hatp(var [var], [replace])}} Save P-hat for ujive (optionally for jive; optinally replace target if it exists).
 {p_end}
 {synopt :{opth save:results(str)}} Save results into mata object.
 {p_end}
