@@ -13,8 +13,10 @@ jobs:
       - uses: actions/checkout@v2
       - name: dependencies and compile 
         run: |
-          brew install eigen
-          make osx EIGEN=/usr/local/include/eigen3
+          # brew install eigen
+          git clone https://gitlab.com/libeigen/eigen.git
+          cd eigen && git checkout 3.3.9 && cd ..
+          make osx EIGEN=`pwd`/eigen
           shasum src/build/manyiv_macosx.plugin
           otool -L src/build/manyiv_macosx.plugin
       - name: commit plugin

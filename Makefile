@@ -54,8 +54,8 @@ manyiv: src/plugin/manyiv.cpp src/plugin/stplugin.c
 
 ## Compile architecture-specific version for OSX
 osx_combine: src/plugin/manyiv.cpp src/plugin/stplugin.c
-	$(GCC) $(CFLAGS)-arch arm64   -o $(OUT).arm64  $^ $(OSTRAIL)
-	$(GCC) $(CFLAGS)-arch x86_64  -o $(OUT).x86_64 $^ $(OSTRAIL)
+	$(GCC) $(CFLAGS) -arch arm64   -o $(OUT).arm64  $^ $(OSTRAIL)
+	$(GCC) $(CFLAGS) -arch x86_64  -o $(OUT).x86_64 $^ $(OSTRAIL)
 	lipo -create -output $(OUT) $(OUT).x86_64 $(OUT).arm64
 
 .PHONY: clean
