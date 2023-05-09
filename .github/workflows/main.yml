@@ -14,7 +14,7 @@ jobs:
       - name: dependencies and compile 
         run: |
           brew install eigen
-          make all EIGEN=/usr/local/include/eigen3
+          make osx EIGEN=/usr/local/include/eigen3
           shasum src/build/manyiv_macosx.plugin
           otool -L src/build/manyiv_macosx.plugin
       - name: commit plugin
