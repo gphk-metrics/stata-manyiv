@@ -1,9 +1,9 @@
 cap mata mata drop ManyIVreg_Absorb()
 cap mata mata drop ManyIVreg_Factor()
 cap mata mata drop ManyIVreg_Absorb_New()
-cap mata mata drop sf_helper_counts()
-cap mata mata drop sf_helper_corder()
-cap mata mata drop sf_helper_unique()
+cap mata mata drop manyiv_helper_counts()
+cap mata mata drop manyiv_helper_corder()
+cap mata mata drop manyiv_helper_unique()
 
 mata
 class ManyIVreg_Factor
@@ -196,8 +196,8 @@ void function ManyIVreg_Absorb::combine()
             sel = panelsubmatrix(index(refj), i, info(refj))
             gid = groupid(j)[sel]
 
-            counts  = colshape(sf_helper_counts(gid, nlevels[j]), 1)
-            order   = sf_helper_corder(gid, gcumsum = runningsum(counts))
+            counts  = colshape(manyiv_helper_counts(gid, nlevels[j]), 1)
+            order   = manyiv_helper_corder(gid, gcumsum = runningsum(counts))
             gcumsum = select(gcumsum, counts)
             gencode = runningsum(counts :> 0)
             if ( length(gcumsum) > 1 ) {
@@ -279,7 +279,7 @@ void function ManyIVreg_Absorb::flagredundant(| real scalar skipredundant)
                 if ( skip(refj)[i] ) continue
                 sel    = panelsubmatrix(index(refj), i, info(refj))
                 gid    = groupid(j)[sel]
-                counts = colshape(sf_helper_counts(gid, nlevels[j]), 1)
+                counts = colshape(manyiv_helper_counts(gid, nlevels[j]), 1)
                 D12[|(offset + 1, i) \ (offset + nlevels[j], i)|] = counts
             }
             offset = offset + nlevels[j]
@@ -423,7 +423,7 @@ void function ManyIVreg_Absorb::dropfromindex(real colvector dropindex, | real s
         groupid = groupid(j)
         index   = index(j)
         skip    = skip(j)
-        counts  = colshape(sf_helper_counts(groupid[dropindex], nl), 1)
+        counts  = colshape(manyiv_helper_counts(groupid[dropindex], nl), 1)
         sel     = selectindex(counts)
         if ( j == reference ) {
             selix  = info[sel, 1]
@@ -491,7 +491,7 @@ void function ManyIVreg_Absorb::dropfromindex(real colvector dropindex, | real s
 }
 
 // Counting sort order given counts of number of repeated elements (assumes id is encoded)
-real colvector sf_helper_corder(real vector id, real colvector cumsum)
+real colvector manyiv_helper_corder(real vector id, real colvector cumsum)
 {
     real colvector order, ix
     real scalar i, level, nobs
@@ -506,7 +506,7 @@ real colvector sf_helper_corder(real vector id, real colvector cumsum)
 }
 
 // Count number of times each level repeats given number of levels (assumes id is encoded)
-real rowvector sf_helper_counts(real vector id, real scalar nlevels)
+real rowvector manyiv_helper_counts(real vector id, real scalar nlevels)
 {
     real rowvector counts
     real scalar i, j
@@ -520,7 +520,7 @@ real rowvector sf_helper_counts(real vector id, real scalar nlevels)
 }
 
 // Unique elements given number of levels (assumes id is encoded)
-real vector sf_helper_unique(real vector id, real scalar nlevels)
+real vector manyiv_helper_unique(real vector id, real scalar nlevels)
 {
     real rowvector present
     real scalar i
@@ -667,7 +667,7 @@ real colvector function ManyIVreg_Absorb::d_projection(| real scalar base)
         for(i = 1; i <= nlevels[j]; i++) {
             sel = panelsubmatrix(index(j), i, info(j))
             gid = groupid(jix)[sel]
-            s_i = sf_helper_counts(gid, nlevels[jix])
+            s_i = manyiv_helper_counts(gid, nlevels[jix])
             if ( nskip ) {
                 s_i[selskip] = J(1, nskip, 0)
             }

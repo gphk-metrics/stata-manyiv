@@ -17,16 +17,17 @@ ifeq ($(OS),Windows_NT)
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S),Linux)
+		GCC = g++
 		OSFLAGS = -shared -fPIC -DSYSTEM=OPUNIX
 		OSTRAIL =
 		OUT = src/build/manyiv_unix.plugin
 	endif
 	ifeq ($(UNAME_S),Darwin)
+		GCC = clang++
 		OSFLAGS = -bundle -DSYSTEM=APPLEMAC
 		OSTRAIL =
 		OUT = src/build/manyiv_macosx.plugin
 	endif
-	GCC = g++
 endif
 
 ifeq ($(EXECUTION),windows)

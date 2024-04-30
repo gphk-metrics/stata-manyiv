@@ -1,12 +1,12 @@
 cap mata mata drop ManyIVStats()
 cap mata mata drop ManyIVreg_IM()
 
-cap mata mata drop sf_helper_epsilon()
-cap mata mata drop sf_helper_sig()
-cap mata mata drop sf_helper_annihilator()
-cap mata mata drop sf_helper_solve()
-cap mata mata drop sf_helper_tsolve()
-cap mata mata drop sf_helper_licols()
+cap mata mata drop manyiv_helper_epsilon()
+cap mata mata drop manyiv_helper_sig()
+cap mata mata drop manyiv_helper_annihilator()
+cap mata mata drop manyiv_helper_solve()
+cap mata mata drop manyiv_helper_tsolve()
+cap mata mata drop manyiv_helper_licols()
 
 mata
 struct ManyIVStats {
@@ -135,11 +135,11 @@ void function ManyIVreg_IM::fit(
     }
 
     if ( !_ujiveonly ) {
-        MW_yT  = sf_helper_annihilator(Wp, (yp, Tp))          // [y_⊥ T_⊥] = M_W [y T]
-        MWD_yT = sf_helper_annihilator(Wq, (yq, Tq))          // [y_⊥ T_⊥] = M_W M_D [y T]
-        MWD_Z  = sf_helper_annihilator(Wq, Zq)                // Z_⊥ = M_W M_D Z
+        MW_yT  = manyiv_helper_annihilator(Wp, (yp, Tp))      // [y_⊥ T_⊥] = M_W [y T]
+        MWD_yT = manyiv_helper_annihilator(Wq, (yq, Tq))      // [y_⊥ T_⊥] = M_W M_D [y T]
+        MWD_Z  = manyiv_helper_annihilator(Wq, Zq)            // Z_⊥ = M_W M_D Z
         YY     = (MW_yT' * MW_yT)                             // [y_⊥ T_⊥]' [y_⊥ T_⊥] = [y T]' M_W [y T]
-        RFS    = sf_helper_solve(MWD_Z, MWD_yT)               // [solve(Z_⊥, y_⊥) solve(Z_⊥, T_⊥)] = Reduced form and First stage
+        RFS    = manyiv_helper_solve(MWD_Z, MWD_yT)           // [solve(Z_⊥, y_⊥) solve(Z_⊥, T_⊥)] = Reduced form and First stage
         HZ_yT  = (cols(Zq)? MWD_Z * RFS: 0) :+ MW_yT - MWD_yT // H_{Z_⊥} [y_⊥ T_⊥]
         YPY    = MW_yT' * HZ_yT                               // [y_⊥ T_⊥]' H_{Z_⊥} [y_⊥ T_⊥]
         YMY    = YY - YPY                                     // [y_⊥ T_⊥]' M_{Z_⊥} [y_⊥ T_⊥]
@@ -200,16 +200,16 @@ void function ManyIVreg_IM::fit(
         }
         else {
             if ( _ujiveonly ) {
-                hatTujive = T :- iIDZW :* sf_helper_annihilator(ZW, Tq)
+                hatTujive = T :- iIDZW :* manyiv_helper_annihilator(ZW, Tq)
                 hatPjive  = .
             }
             else {
-                hatTujive = T :- iIDZW :* sf_helper_annihilator(ZW, Tq) //     (I - (I - D_{Z W})^{-1} M_{Z W}) T
-                hatPjive  = sf_helper_annihilator(Wp, hatTujive)        // M_W (I - (I - D_{Z W})^{-1} M_{Z W}) T
+                hatTujive = T :- iIDZW :* manyiv_helper_annihilator(ZW, Tq) //     (I - (I - D_{Z W})^{-1} M_{Z W}) T
+                hatPjive  = manyiv_helper_annihilator(Wp, hatTujive)        // M_W (I - (I - D_{Z W})^{-1} M_{Z W}) T
                 Absorb._hdfe(hatPjive)
             }
 
-            hatTjive  = T :- iIDW :* sf_helper_annihilator(Wp, Tp)  // (I - (I - D_W)^{-1} M_W) T
+            hatTjive  = T :- iIDW :* manyiv_helper_annihilator(Wp, Tp) // (I - (I - D_W)^{-1} M_W) T
             hatPujive = hatTujive - hatTjive // (I - D_W)^{-1} M_W T - (I - D_{Z W})^{-1} M_{Z W} T
                                              // = (I - D_W)^{-1} (I - H_W) T - (I - D_{Z W})^{-1} (I - H_{Z W}) T
                                              // = ((I - D_{Z W})^{-1} (H_{Z W} - I) - (I - D_W)^{-1} (H_W - I) T) T
@@ -256,19 +256,19 @@ void function ManyIVreg_IM::fit(
 
         if ( jive ) {
             se[1, 1::6] = sqrt((
-                sf_helper_sig(MW_yT, beta[1]) / (MW_yT[.,2]'*MW_yT[.,2]),
+                manyiv_helper_sig(MW_yT, beta[1]) / (MW_yT[.,2]'*MW_yT[.,2]),
                 (
-                    sf_helper_sig(MW_yT, beta[2]), sf_helper_sig(MW_yT, beta[3]), sf_helper_sig(MW_yT, beta[4])
+                    manyiv_helper_sig(MW_yT, beta[2]), manyiv_helper_sig(MW_yT, beta[3]), manyiv_helper_sig(MW_yT, beta[4])
                 ) / YPY[2,2],
-                sf_helper_sig(MW_yT, beta[5]) * (hatPjive'  * hatPjive)  / (hatPjive'  * T)^2,
-                sf_helper_sig(MW_yT, beta[6]) * (hatPujive' * hatPujive) / (hatPujive' * T)^2
+                manyiv_helper_sig(MW_yT, beta[5]) * (hatPjive'  * hatPjive)  / (hatPjive'  * T)^2,
+                manyiv_helper_sig(MW_yT, beta[6]) * (hatPujive' * hatPujive) / (hatPujive' * T)^2
             ))
         }
         else {
             se[1, 1::4] = sqrt((
-                sf_helper_sig(MW_yT, beta[1]) / (MW_yT[.,2]'*MW_yT[.,2]),
+                manyiv_helper_sig(MW_yT, beta[1]) / (MW_yT[.,2]'*MW_yT[.,2]),
                 (
-                    sf_helper_sig(MW_yT, beta[2]), sf_helper_sig(MW_yT, beta[3]), sf_helper_sig(MW_yT, beta[4])
+                    manyiv_helper_sig(MW_yT, beta[2]), manyiv_helper_sig(MW_yT, beta[3]), manyiv_helper_sig(MW_yT, beta[4])
                 ) / YPY[2,2]
             ))
         }
@@ -281,12 +281,12 @@ void function ManyIVreg_IM::fit(
         // Note for asymptotics k -> 1 for the various estimators.
         if ( jive ) {
             hatP    = MW_yT[.,2], J(1, 3, HZ_yT[.,2]), hatPjive, hatPujive
-            epsilon = sf_helper_epsilon(MW_yT, beta[1::6])
+            epsilon = manyiv_helper_epsilon(MW_yT, beta[1::6])
             se[2, 1::6] = sqrt(colsum((epsilon :* hatP):^2)) :/ (T' * hatP)
         }
         else {
             hatP    = MW_yT[.,2], J(1, 3, HZ_yT[.,2])
-            epsilon = sf_helper_epsilon(MW_yT, beta[1::4])
+            epsilon = manyiv_helper_epsilon(MW_yT, beta[1::4])
             se[2, 1::4] = sqrt(colsum((epsilon :* hatP):^2)) :/ (T' * hatP)
         }
 
@@ -354,20 +354,20 @@ void function ManyIVreg_IM::fit(
 
         // Notation
         S    = YPY/n
-        eigensystem(sf_helper_solve(Sp, S), ., ei=.)
+        eigensystem(manyiv_helper_solve(Sp, S), ., ei=.)
         mmin = min(Re(ei))
 
         // Hessian of random-effects
         lamre = max(Re(ei)) - K/n
         a     = beta[3] \ 1
         b     = 1 \ -beta[3]
-        Omre  = (n-K-L) * Sp/(n-L) + n * (S :- lamre * sf_helper_tsolve((a*a'), sf_helper_tsolve(a', Sp) * a)) / (n-L)
+        Omre  = (n-K-L) * Sp/(n-L) + n * (S :- lamre * manyiv_helper_tsolve((a*a'), manyiv_helper_tsolve(a', Sp) * a)) / (n-L)
         Qs    = (b' * S * b) / (b' * Omre * b)
         c     = lamre * Qs / ((1-L/n) * (K/n+lamre))
 
         se[4, 3] = sqrt(
             -b'*Omre*b / (n*lamre) * (lamre+K/n) /
-            (Qs*Omre[2,2] - S[2,2] + (c/(1-c)) * Qs / (sf_helper_tsolve(a', Omre) * a))
+            (Qs*Omre[2,2] - S[2,2] + (c/(1-c)) * Qs / (manyiv_helper_tsolve(a', Omre) * a))
         )
 
         // mbtsls, using maximum URE likelihood plug-in estimator
@@ -379,7 +379,7 @@ void function ManyIVreg_IM::fit(
             Omure = Sp
         }
         else {
-            Lam22 = lamre / (sf_helper_tsolve(a', Omre) * a)
+            Lam22 = lamre / (manyiv_helper_tsolve(a', Omre) * a)
             Omure = Omre
         }
 
@@ -451,7 +451,7 @@ void function ManyIVreg_IM::loadvars(
         yTZW   = Absorb.hdfe((y, T, Z, W))
         zselix = cols(Z)? 3::(2 + cols(Z)): J(0, 1, 0)
         wselix = cols(W)? (3 + cols(Z))::(2 + cols(Z) + cols(W)): J(0, 1, 0)
-        coll   = sf_helper_licols(yTZW[., wselix], Absorb.hdfetol / n)
+        coll   = manyiv_helper_licols(yTZW[., wselix]) // , Absorb.hdfetol / n)
 
 // TODO: xx does this actually merit error? Perfectly projecting into
 // covariates might be something to allow. Otherwise don't omit y, T.
@@ -486,7 +486,7 @@ void function ManyIVreg_IM::loadvars(
         yTZW   = AbsorbIV.hdfe((y, T, Z, select(W, selw)))
         zselix = cols(Z)? 3::(3 + cols(Z) - 1): J(0, 1, 0)
         wselix = any(selw)? (3 + cols(Z))::cols(yTZW): J(0, 1, 0)
-        coll   = sf_helper_licols(yTZW[., (zselix \ wselix)], AbsorbIV.hdfetol / n)
+        coll   = manyiv_helper_licols(yTZW[., (zselix \ wselix)]) // , AbsorbIV.hdfetol / n)
 
 // TODO: xx ibid.
         yq   = yTZW[., 1]
@@ -502,7 +502,7 @@ void function ManyIVreg_IM::loadvars(
         // Account for collinear columns | instrument in RF and FS (only
         // needed of no absorb instruments)
         if ( Absorb.nabsorb ) {
-            coll = sf_helper_licols(yTZW[., (zselix \ wselix)], Absorb.hdfetol / n)
+            coll = manyiv_helper_licols(yTZW[., (zselix \ wselix)]) // , Absorb.hdfetol / n)
             Zq   = cols(Z)? select(yTZW[., zselix], coll[zselix :- 2]): Z
             Wq   = cols(W)? select(yTZW[., wselix], coll[wselix :- 2]): Wp
 // TODO: xx ibid.
@@ -616,44 +616,51 @@ void function ManyIVreg_IM::print()
     printf("first-stage F = %s\n", strtrim(sprintf("%21.3fc", F)))
 }
 
-real matrix function sf_helper_epsilon(real matrix Yp, real rowvector beta)
+real matrix function manyiv_helper_epsilon(real matrix Yp, real rowvector beta)
 {
     return(Yp[., 1] :- Yp[., 2] * beta)
 }
 
-real scalar function sf_helper_sig(real matrix Yp, real scalar beta)
+real scalar function manyiv_helper_sig(real matrix Yp, real scalar beta)
 {
     real colvector e
-    e = sf_helper_epsilon(Yp, beta)
+    e = manyiv_helper_epsilon(Yp, beta)
     return(e' * e / length(e))
 }
 
-real matrix function sf_helper_annihilator(real matrix X, real matrix Y)
+real matrix function manyiv_helper_annihilator(real matrix X, real matrix Y)
 {
-    return((cols(X) & cols(Y))? (Y - X * sf_helper_solve(X, Y)): Y)
+    return((cols(X) & cols(Y))? (Y - X * manyiv_helper_solve(X, Y)): Y)
 }
 
-real matrix function sf_helper_solve(real matrix X, real matrix Y)
+real matrix function manyiv_helper_solve(real matrix X, real matrix Y)
 {
     return((cols(X) & cols(Y))? (invsym(cross(X, X)) * cross(X, Y)): J(cols(X), cols(Y), 0))
 }
 
-real matrix function sf_helper_tsolve(real matrix X, real matrix Y)
+real matrix function manyiv_helper_tsolve(real matrix X, real matrix Y)
 {
     return((invsym(cross(Y', Y')) * cross(Y', X'))')
 }
 
-real rowvector function sf_helper_licols(real matrix X, | real scalar tol)
+// NOTE: Test them against each other; this version _should_ be better so why
+// did I change?
+real rowvector function manyiv_helper_licols(real matrix X)
 {
-    real rowvector p
-    real matrix R
-    real colvector D
     if ( (cols(X) == 0) | (rows(X) == 0) ) return(J(1, 0, 0))
-    if ( args() < 2 ) tol = 0
-    tol = max((tol, epsilon(rows(X))))
-
-    qrdp(cross(X, X), ., R = ., p = .)
-    D = abs(diagonal(R))
-    return(rowshape((D[order(p', 1)] :/ max(1 \ D)) :>= tol, 1))
+    return(rowshape(diagonal(invsym(quadcross(X, X), 1..cols(X))) :!= 0, 1))
 }
+
+// real rowvector function manyiv_helper_licols(real matrix X, | real scalar tol)
+// {
+//     real rowvector p
+//     real matrix R
+//     real colvector D
+//     if ( (cols(X) == 0) | (rows(X) == 0) ) return(J(1, 0, 0))
+//     if ( args() < 2 ) tol = 0
+//     tol = max((tol, epsilon(rows(X))))
+//     qrdp(cross(X, X), ., R = ., p = .)
+//     D = abs(diagonal(R))
+//     return(rowshape((D[order(p', 1)] :/ max(1 \ D)) :>= tol, 1))
+// }
 end

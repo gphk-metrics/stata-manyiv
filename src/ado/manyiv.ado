@@ -1,4 +1,4 @@
-*! version 0.6.8 09May2023
+*! version 0.7.0 30Apr2024
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
@@ -13,11 +13,7 @@
 *       and expected error exits and CLT sims for SEs.
 
 * TODO: xx It's not obvious how to detect collinearity (numerically);
-*       ask if this algorithm is OK:
-*       - QR decomposition
-*       - Diagonal entries of R matrix
-*       - Scale by largest element (if > 1)
-*       - Drop if below tolerance (max of 1e-12 and machine epsilon * nobs)
+*       you're using qr decomposition but using Stata's invsym seems better.
 
 capture program drop manyiv
 program manyiv, eclass

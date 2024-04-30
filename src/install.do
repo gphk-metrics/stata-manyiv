@@ -7,5 +7,5 @@ cap noi erase src/build/lmanyiv.mlib
 do src/mata/manyiv_absorb.mata
 do src/mata/manyiv_internals.mata
 mata: mata mlib create lmanyiv, dir("src/build") replace
-mata: mata mlib add lmanyiv ManyIV*() sf_helper*(), dir("src/build") complete
+mata: mata mlib add lmanyiv ManyIV*() manyiv_helper*(), dir("src/build") complete
 net install manyiv, from(`c(pwd)') replace

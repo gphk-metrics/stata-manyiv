@@ -1,10 +1,11 @@
 ManyIV
 ======
 
-Various instrumental variables regressions (OLS, TSLS, LIML, MBTSLS,
-JIVE, UJIVE, RTSLS) with absorbed instruments and controls.
+**Note: Currently in beta.** Various instrumental variables regressions
+(OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS) with absorbed instruments and
+controls.
 
-`version 0.6.8 09May2023` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples) | [Compiling](#compiling)
+`version 0.7.0 30Apr2024` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples) | [Compiling](#compiling)
 
 ### Installation
 
