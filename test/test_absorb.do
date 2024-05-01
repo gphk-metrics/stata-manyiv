@@ -72,6 +72,6 @@ mata ZZ = DD' * DD
 mata dd = rowsum((DD * invsym(ZZ)) :* DD)
 
 mata B.exportc("`info'")
-plugin call manyiv_plugin, `"_plugin_run"' `"`info'"' ""
+plugin call manyiv_plugin, `"_plugin_run"' `"`info'"' `"_plugin_bench"'
 mata B.importc("`info'")
 mata max(abs(dd - B.d_projection))
