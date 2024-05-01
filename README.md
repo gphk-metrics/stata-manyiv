@@ -101,7 +101,7 @@ manyiv y (x = z1 z2), absorb(fe) absorbiv(iv) forcejive
 
 ### Compiling
 
-To compute the jive and ujive estimators with multiple absorb levels, `manyiv` uses a plugin compiled with the [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) library. Pre-compiled binaries are provided in [this reposirtory](src/build). To re-compile the plugin from source, download Eigen3 using your system's package manager (e.g. `brew`, `apt`, etc.) or from [their website](http://eigen.tuxfamily.org/index.php?title=Main_Page#Download) and run:
+To compute the jive and ujive estimators with multiple absorb levels, `manyiv` uses a plugin compiled with the [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) library. Pre-compiled binaries are provided in [this repository](src/build). To re-compile the plugin from source, download Eigen3 using your system's package manager (e.g. `brew`, `apt`, etc.) or from [their website](http://eigen.tuxfamily.org/index.php?title=Main_Page#Download) and run:
 
 ```
 git clone git@github.com:gphk-metrics/stata-manyiv
