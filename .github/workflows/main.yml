@@ -19,6 +19,8 @@ jobs:
           make osx EIGEN=`pwd`/eigen
           shasum src/build/manyiv_macosx.plugin
           otool -L src/build/manyiv_macosx.plugin
+          rm -rf eigen
+          rm -f src/build/manyiv_macosx.plugin.{arm64,x86_64}
       - name: commit plugin
         run: |
           git config --global user.name 'Mauricio Caceres'
@@ -26,4 +28,6 @@ jobs:
           git remote set-url origin https://x-access-token:${{ secrets.COMPILE_TOKEN }}@github.com/${{ github.repository }}
           git add src/build/manyiv_macosx.plugin
           echo ${GITHUB_REF##*/}
-          [ -n "$(git status --porcelain)" ] && git commit -m "[Automated Commit] OSX plugin" && git fetch && git push -f origin HEAD:${GITHUB_REF##*/}
+          [ -n "$(git status --porcelain)" ] && git commit -m "[Automated Commit] OSX plugin"
+          git fetch
+          git push -f origin HEAD:${GITHUB_REF##*/}
