@@ -9,38 +9,34 @@ controls.
 
 ### Installation
 
-From the command line:
+From Stata:
 
 ```
-git clone git@github.com:gphk-metrics/stata-manyiv
+local github "https://raw.githubusercontent.com"
+net install manyiv, from(`github'/gphk-metrics/stata-manyiv/main/)
+manyiv _plugin_check
 ```
 
-(or download the code manually and unzip). From Stata:
+You can also clone or download the code manually, e.g. to
+`stata-manyiv-main`, and install from a local folder:
+
+```
+git clone git@github.com:gphk-metrics/stata-manyiv stata-manyiv-main
+```
+
+(or download the code manually and unzip). Then from Stata:
 
 ```
 cap noi net uninstall manyiv
 net install manyiv, from(`c(pwd)'/stata-manyiv)
 ```
 
-(Change `stata-manyiv` if you download the package to a different
-folder; e.g. `stata-manyiv-main`.) To check that `manyiv` was
-installed correctly, please run
-
-```
-manyiv _plugin_check
-```
-
-If you get an error, `manyiv` may experience issues in some cases.
-In particular, without the plugin the number of absorb variables is
-capped at 2, and when the absorb variables have many levels the
-function's performance will be very slow. If the plugin fails to
-load, please see the [compiling](#compiling) section below.
-
-NB: if the repo were public, this would be installed from Stata via
-```
-local github "https://raw.githubusercontent.com"
-net install manyiv, from(`github'/gphk-metrics/stata-manyiv/master/)
-```
+**NOTE:** If you get an error when checking the plugin you can still use
+`manyiv` but its capabilities will be limited.  In particular, without the
+plugin the number of absorb variables is capped at 2, and when the absorb
+variables have many levels the function's performance will be very slow. If
+the plugin fails to load, please see the [compiling](#compiling) section
+below.
 
 ### Usage
 
@@ -101,7 +97,7 @@ manyiv y (x = z1 z2), absorb(fe) absorbiv(iv) forcejive
 
 ### Compiling
 
-To compute the jive and ujive estimators with multiple absorb levels, `manyiv` uses a plugin compiled with the [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) library. Pre-compiled binaries are provided in [this repository](src/build). To re-compile the plugin from source, download Eigen3 using your system's package manager (e.g. `brew`, `apt`, etc.) or from [their website](http://eigen.tuxfamily.org/index.php?title=Main_Page#Download) and run:
+To compute the jive and ujive estimators with multiple absorb levels, `manyiv` uses a plugin compiled with the [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) library. Pre-compiled binaries are provided in [this reposirtory](src/build). To re-compile the plugin from source, download Eigen3 using your system's package manager (e.g. `brew`, `apt`, etc.) or from [their website](http://eigen.tuxfamily.org/index.php?title=Main_Page#Download) and run:
 
 ```
 git clone git@github.com:gphk-metrics/stata-manyiv
