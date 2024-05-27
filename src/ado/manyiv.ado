@@ -1,4 +1,4 @@
-*! version 0.7.0 30Apr2024
+*! version 0.7.1 27May2024
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
@@ -253,6 +253,7 @@ program manyiv, eclass
     ereturn local instrumented: copy local ivendog
     ereturn local instruments:  copy local ivinst
     ereturn local exogenous:    copy local ivexog
+    ereturn local cmd manyiv
 
     if ( `:list sizeof ivinst' ) {
         mata st_numscalar("`kinst'", rows(`ManyIVreg'.RFS))

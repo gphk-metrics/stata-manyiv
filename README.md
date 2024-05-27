@@ -5,7 +5,7 @@ ManyIV
 (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS) with absorbed instruments and
 controls.
 
-`version 0.7.0 30Apr2024` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples) | [Compiling](#compiling)
+`version 0.7.1 27May2024` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples) | [Compiling](#compiling)
 
 ### Installation
 

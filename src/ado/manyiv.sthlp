@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.7.0 30Apr2024}{...}
+{* *! version 0.7.1 27May2024}{...}
 {viewerdialog manyiv "dialog manyiv"}{...}
 {vieweralsosee "[R] manyiv" "mansection R manyiv"}{...}
 {viewerjumpto "Syntax" "manyiv##syntax"}{...}
