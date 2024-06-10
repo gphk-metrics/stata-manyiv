@@ -5,7 +5,7 @@ ManyIV
 (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS) with absorbed instruments and
 controls.
 
-`version 0.7.1 27May2024` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples) | [Compiling](#compiling)
+`version 0.7.2 09Jun2024` | [Installation](#installation) | [Usage](#usage) | [Examples](#examples) | [Compiling](#compiling)
 
 ### Installation
 
@@ -68,6 +68,13 @@ manyiv y (x = z1 z2) w, absorb(fe) cluster(c)
 manyiv y (x = z1 z2) w, absorbiv(iv) cluster(c)
 manyiv y (x = z1 z2) w, absorb(fe) absorbiv(iv) cluster(c)
 manyiv y (x = .)     w, absorb(fe) absorbiv(iv) cluster(c)
+```
+
+You can also save any of the estimators to a Stata table:
+
+```stata
+manyiv, est(TSLS)  vce(cluster)
+manyiv, est(UJIVE) vce(cluster)
 ```
 
 There are instances where jive/ujive will fail because they are

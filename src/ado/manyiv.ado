@@ -1,4 +1,4 @@
-*! version 0.7.1 27May2024
+*! version 0.7.2 09Jun2024
 *! Instrumental variables regression (OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE, RTSLS)
 *! Based on ivreg.m by Michal Kolesár <kolesarmi@googlemail dotcom>
 *! Adapted for Stata by Mauricio Caceres Bravo <mauricio.caceres.bravo@gmail.com>
@@ -18,6 +18,28 @@
 capture program drop manyiv
 program manyiv, eclass
     version 14.1
+
+    qui syntax [anything(everything)] [if] [in], [ESTimator(str) VCEtype(str) *]
+    if `"`anything'"' == "" {
+        if ( `"`e(cmd)'"' != "manyiv" ) error 301
+        if ( "`estimator'`vcetype'" == "" ) {
+             disp as error "nothing to do; please specify which estimates to display"
+             exit 198
+        }
+        else if !inlist("`vcetype'", "unadjusted", "robust", "cluster") {
+            disp as err "vce(`vcetype') not allowed; available: unadjusted, robust, cluster"
+             exit 198
+        }
+        else if !inlist("`estimator'", "OLS", "TSLS", "LIML", "MBTSLS", "JIVE", "UJIVE") {
+            disp as err "est(`estimator') not allowed; available: OLS, TSLS, LIML, MBTSLS, JIVE, UJIVE"
+             exit 198
+        }
+        else {
+            Post, est(`estimator') vce(`vcetype') `options'
+            // repost
+        }
+        exit 0
+    }
 
     ***********************************************************************
     *                            Plugin Check                             *
@@ -241,7 +263,8 @@ program manyiv, eclass
     }
 
     tempname F Omega Xi Sargan CD rf fs jive kinst
-    ereturn post `beta', esample(`touse')
+    mata st_local("N", strofreal(`ManyIVreg'.n))
+    ereturn post `beta', esample(`touse') obs(`N')
     if ( `estimatese' ) {
         ereturn matrix se    = `se'
         ereturn scalar small = `small'
@@ -702,6 +725,27 @@ program plugin_error_dispatcher
     if `rc' == 1703 disp as err "plugin error: unable to export results back to Stata from plugin"
     if `rc' disp as err "(performance warning: plugin failed to run; will fall back on pure Stata code)"
     exit `rc'
+end
+
+capture program drop Post
+program Post, eclass
+    syntax, ESTimator(str) VCEtype(str) [*]
+
+    if "`vcetype'" == "unadjusted" local row Homoskedastic
+    if "`vcetype'" == "robust"     local row Heteroscedastic
+    if "`vcetype'" == "cluster"    local row Cluster
+    ereturn local vcetype = proper("`vcetype'")
+
+    tempname b V
+    matrix `b' = e(b)
+    matrix `b' = `b'[1, "`estimator'"]
+    matrix `V' = e(se)
+    matrix `V' = `V'["`row'", "`estimator'"]
+    matrix `V' = `V' * `V'
+
+    _coef_table_header, nomodeltest title(`estimator' estimator with `row' SE)
+    disp ""
+    _coef_table, noempty bmatrix(`b') vmatrix(`V') `options'
 end
 
 * cap findfile manyiv_absorb.mata

@@ -42,6 +42,11 @@ program consistency
     egen fefe = group(iv2 fe2)
 
     manyiv y (x = z1 z2), cluster(c) noc
+    foreach vce in unadjusted robust cluster {
+        foreach est in OLS TSLS LIML MBTSLS JIVE UJIVE {
+            manyiv, est(`est') vce(`vce')
+        }
+    }
     manyiv y (x = z1 z2), cluster(c) hatp(hatp_ujive hatp_jive)
     ivreg y (x = hatp_ujive), cluster(c)
     ivreg y (x = hatp_jive),  cluster(c)
